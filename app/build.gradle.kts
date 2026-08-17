@@ -45,6 +45,29 @@ val gitVersionName: String by lazy {
     }
 }
 
+// 本机默认只编 arm64、关 LTO；CI=true 保持双 ABI + LTO
+// -Pmaa.abi=all|arm64-v8a|x86_64 或 local.properties 覆盖
+val ci = System.getenv("CI")?.equals("true", ignoreCase = true) == true
+val abiRaw = (findProperty("maa.abi") as String?)?.trim().orEmpty()
+    .ifEmpty { localProperties.getProperty("maa.abi", "").trim() }
+    .ifEmpty { if (ci) "all" else "arm64-v8a" }
+val nativeAbis: List<String> = if (abiRaw.equals("all", ignoreCase = true)) {
+    listOf("arm64-v8a", "x86_64")
+} else {
+    abiRaw.split(',', ' ').map(String::trim).filter(String::isNotEmpty)
+}
+val nativeLto = when (
+    (findProperty("maa.nativeLto") as String?)?.trim()
+        ?: localProperties.getProperty("maa.nativeLto", "")
+) {
+    "true" -> true
+    "false" -> false
+    else -> ci
+}
+println("[ABI] ${nativeAbis.joinToString()}")
+println("[native] LTO=$nativeLto")
+println("[Java Version] ${System.getProperty("java.version")}")
+
 android {
     namespace = "com.aliothmoon.maameow"
     compileSdk = 37
@@ -66,13 +89,15 @@ android {
         buildConfigField("String", "MAA_CORE_VERSION", "\"$maaCoreVersion\"")
 
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            abiFilters.addAll(nativeAbis)
         }
-
 
         externalNativeBuild {
             cmake {
-                arguments("-DANDROID_STL=c++_shared")
+                arguments(
+                    "-DANDROID_STL=c++_shared",
+                    "-DMAA_NATIVE_LTO=${if (nativeLto) "ON" else "OFF"}",
+                )
             }
         }
     }
@@ -94,13 +119,24 @@ android {
     }
 
     buildTypes {
+        val minifyProguardFiles = listOf(
+            getDefaultProguardFile("proguard-android-optimize.txt"),
+            "proguard-rules.pro",
+        )
+        // local.properties: maa.debugR8=true 时 debug 也走 R8
+        val debugR8 = localProperties.getProperty("maa.debugR8", "false").toBoolean()
+        getByName("debug") {
+            isMinifyEnabled = debugR8
+            isShrinkResources = debugR8
+            if (debugR8) {
+                proguardFiles(*minifyProguardFiles.toTypedArray())
+                println("[R8] debug minify+shrink enabled (maa.debugR8=true)")
+            }
+        }
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(*minifyProguardFiles.toTypedArray())
             val keystorePath = System.getenv("KEYSTORE_PATH")
                 ?: localProperties.getProperty("KEYSTORE_PATH", "")
             if (keystorePath.isNotEmpty()) {

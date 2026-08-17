@@ -186,6 +186,27 @@ class SettingsViewModel(
         }
     }
 
+    val reportToPenguin: StateFlow<Boolean> = appSettingsManager.reportToPenguin
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    fun setReportToPenguin(enabled: Boolean) {
+        viewModelScope.launch { appSettingsManager.setReportToPenguin(enabled) }
+    }
+
+    val reportToYituliu: StateFlow<Boolean> = appSettingsManager.reportToYituliu
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    fun setReportToYituliu(enabled: Boolean) {
+        viewModelScope.launch { appSettingsManager.setReportToYituliu(enabled) }
+    }
+
+    val penguinId: StateFlow<String> = appSettingsManager.penguinId
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
+    fun setPenguinId(id: String) {
+        viewModelScope.launch { appSettingsManager.setPenguinId(id) }
+    }
+
     val forceFullscreenOnVirtualDisplay: StateFlow<Boolean> =
         appSettingsManager.forceFullscreenOnVirtualDisplay
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -196,20 +217,7 @@ class SettingsViewModel(
         }
     }
 
-    // ───────────────── 唤醒 + 解锁 ─────────────────
-
-    /**
-     * 功能是否对当前后端可用。只看用户选定的后端，不看运行时连接状态：
-     * 按连接状态隐藏会让设置项在服务没连上时凭空消失，用户会以为功能丢了。
-     *
-     * 为什么限定 Root：唤醒解锁要调 IPowerManager.wakeUp 和
-     * IWindowManager.dismissKeyguard，并往 display 0 注入按键。Shizuku 的 shell uid
-     * 未必够，且设备重启后 Shizuku 需要手动授权，定时任务醒来时往往还没就绪。
-     */
-    val wakeFeatureAvailable: StateFlow<Boolean> =
-        appSettingsManager.startupBackend
-            .map { it == RemoteBackend.ROOT }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    // ───────────────── 定时唤醒解锁 ─────────────────
 
     val wakeUnlockType: StateFlow<String> =
         appSettingsManager.wakeUnlockType
@@ -236,62 +244,19 @@ class SettingsViewModel(
     private val _wakeTestState = MutableStateFlow<WakeTestState?>(null)
     val wakeTestState: StateFlow<WakeTestState?> = _wakeTestState.asStateFlow()
 
-    /**
-     * 测试唤醒解锁。不主动息屏上锁——那需要先让设备真的锁上，而在前台点按钮的场景下
-     * 做不到可靠复现。这里只验证「当前状态 -> 亮屏且未锁屏」这一段，
-     * 用户想测完整链路可以自己锁屏后用定时任务触发。
-     */
     fun runWakeTest() {
         if (_wakeTestState.value == WakeTestState.Testing) return
         viewModelScope.launch {
             _wakeTestState.value = WakeTestState.Testing
             val credential = appSettingsManager.wakeCredential.value
-            _wakeTestState.value = WakeTestState.Done(wakeUnlockEngine.wakeAndUnlock(credential))
+            _wakeTestState.value = WakeTestState.Done(
+                wakeUnlockEngine.testUnlock(credential),
+            )
         }
     }
 
     fun clearWakeTestResult() {
         _wakeTestState.value = null
-    }
-
-
-    // 后台虚拟显示器模式：游戏漂移自动拉回开关
-    val driftAutoRepinEnabled: StateFlow<Boolean> =
-        appSettingsManager.driftAutoRepinEnabled
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-
-    fun setDriftAutoRepinEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            appSettingsManager.setDriftAutoRepinEnabled(enabled)
-        }
-    }
-
-    // 漂移拉回延迟（秒）
-    val driftAutoRepinDelaySec: StateFlow<Int> =
-        appSettingsManager.driftAutoRepinDelaySec
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 5)
-
-    fun setDriftAutoRepinDelaySec(seconds: Int) {
-        viewModelScope.launch {
-            appSettingsManager.setDriftAutoRepinDelaySec(seconds)
-        }
-    }
-
-    val allowForegroundScheduledTask: StateFlow<Boolean> =
-        appSettingsManager.allowForegroundScheduledTask
-
-    fun setAllowForegroundScheduledTask(enabled: Boolean) {
-        viewModelScope.launch {
-            appSettingsManager.setAllowForegroundScheduledTask(enabled)
-        }
-    }
-
-    val runScheduleWhenLocked: StateFlow<Boolean> = appSettingsManager.runScheduleWhenLocked
-
-    fun setRunScheduleWhenLocked(enabled: Boolean) {
-        viewModelScope.launch {
-            appSettingsManager.setRunScheduleWhenLocked(enabled)
-        }
     }
 
     val updateChannel: StateFlow<UpdateChannel> = appSettingsManager.updateChannel

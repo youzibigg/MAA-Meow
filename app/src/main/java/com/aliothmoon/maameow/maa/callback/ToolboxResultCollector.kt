@@ -18,6 +18,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** 像素画填色进度 */
+data class PixelPaintProgress(val done: Int, val total: Int, val color: Int)
+
 /** 工具类任务结果：SubTaskHandler 回调转发。 */
 class ToolboxResultCollector(
     private val resourceDataManager: ResourceDataManager,
@@ -28,7 +31,22 @@ class ToolboxResultCollector(
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val achievement = DoubleSyncAchievement()
 
-    fun onSessionStart() = achievement.clear()
+    fun onSessionStart() {
+        achievement.clear()
+        _pixelPaintProgress.value = null
+    }
+
+    /** 像素画填色进度，来自 Core 的 PixelPaintProgress 回调 */
+    private val _pixelPaintProgress = MutableStateFlow<PixelPaintProgress?>(null)
+    val pixelPaintProgress: StateFlow<PixelPaintProgress?> = _pixelPaintProgress.asStateFlow()
+
+    /** 返回解析结果，免得调用方再解一遍 */
+    fun onPixelPaintProgress(details: JSONObject?): PixelPaintProgress? {
+        val done = details?.getIntValue("done") ?: return null
+        val progress = PixelPaintProgress(done, details.getIntValue("total"), details.getIntValue("color"))
+        _pixelPaintProgress.value = progress
+        return progress
+    }
 
     private val _recruitTags = MutableStateFlow<List<String>>(emptyList())
     val recruitTags: StateFlow<List<String>> = _recruitTags.asStateFlow()

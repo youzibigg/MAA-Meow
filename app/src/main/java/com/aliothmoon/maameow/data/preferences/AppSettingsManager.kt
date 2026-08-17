@@ -40,8 +40,9 @@ class AppSettingsManager(
     companion object {
         val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "app_settings")
 
-        /** 解锁方式取值。不支持图案锁。 */
-        val WAKE_UNLOCK_TYPES = setOf("none", "swipe", "pin")
+        /** 解锁方式：滑动 / PIN */
+        val WAKE_UNLOCK_TYPES = setOf("swipe", "pin")
+        /** 纯数字 PIN 最大位数 */
         const val MAX_PIN_LENGTH = 16
 
         /** 页面缩放：0 = 自动；手动为 80–110 */
@@ -69,8 +70,8 @@ class AppSettingsManager(
         fun isFontSizeScaleAuto(scale: Int): Boolean = scale == FONT_SIZE_SCALE_AUTO
 
         /**
-         * 得到实际生效的页面缩放百分比。
-         * 自动模式使用 [com.aliothmoon.maameow.utils.UiScale.recommendedFontSizeScale]。
+         * 得到实际生效的页面缩放百分比
+         * 自动模式见 [com.aliothmoon.maameow.utils.UiScale.recommendedFontSizeScale]
          */
         fun resolveFontSizeScale(
             stored: Int,
@@ -526,40 +527,6 @@ class AppSettingsManager(
         }
     }
 
-    // 后台虚拟显示器模式：游戏漂移自动拉回开关
-    val driftAutoRepinEnabled: StateFlow<Boolean> = settings
-        .map { it.driftAutoRepinEnabled.toBooleanStrictOrNull() ?: true }
-        .distinctUntilChanged()
-        .stateIn(
-            scope, SharingStarted.Eagerly,
-            initialSettings.driftAutoRepinEnabled.toBooleanStrictOrNull() ?: true
-        )
-
-    suspend fun setDriftAutoRepinEnabled(enabled: Boolean) {
-        with(AppSettingsSchema) {
-            context.dataStore.edit { it[driftAutoRepinEnabled] = enabled.toString() }
-        }
-    }
-
-    // 漂移拉回延迟（秒）。合法范围 1~60；非法值回落到 5。
-    val driftAutoRepinDelaySec: StateFlow<Int> = settings
-        .map { coerceDriftAutoRepinDelaySec(it.driftAutoRepinDelaySec) }
-        .distinctUntilChanged()
-        .stateIn(
-            scope, SharingStarted.Eagerly,
-            coerceDriftAutoRepinDelaySec(initialSettings.driftAutoRepinDelaySec)
-        )
-
-    private fun coerceDriftAutoRepinDelaySec(raw: String): Int =
-        raw.toIntOrNull()?.coerceIn(1, 60) ?: 5
-
-    suspend fun setDriftAutoRepinDelaySec(seconds: Int) {
-        val clamped = seconds.coerceIn(1, 60)
-        with(AppSettingsSchema) {
-            context.dataStore.edit { it[driftAutoRepinDelaySec] = clamped.toString() }
-        }
-    }
-
     // Android 任务配置覆盖开关
     val tasksOverrideEnabled: StateFlow<Boolean> = settings
         .map { it.tasksOverrideEnabled.toBooleanStrictOrNull() ?: false }
@@ -575,48 +542,16 @@ class AppSettingsManager(
         }
     }
 
-    // 长期公告已读版本
-    val announcementReadVersion: StateFlow<String> = settings
-        .map { it.announcementReadVersion }
+    val announcementReadHash: StateFlow<String> = settings
+        .map { it.announcementReadHash }
         .distinctUntilChanged()
-        .stateIn(scope, SharingStarted.Eagerly, initialSettings.announcementReadVersion)
+        .stateIn(scope, SharingStarted.Eagerly, initialSettings.announcementReadHash)
 
-    suspend fun setAnnouncementReadVersion(version: String) {
+    suspend fun setAnnouncementReadHash(hash: String) {
         with(AppSettingsSchema) {
-            context.dataStore.edit { it[announcementReadVersion] = version }
+            context.dataStore.edit { it[announcementReadHash] = hash }
         }
     }
-
-    // 允许在前台模式执行定时任务
-    val allowForegroundScheduledTask: StateFlow<Boolean> = settings
-        .map { it.allowForegroundScheduledTask.toBooleanStrictOrNull() ?: false }
-        .distinctUntilChanged()
-        .stateIn(
-            scope, SharingStarted.Eagerly,
-            initialSettings.allowForegroundScheduledTask.toBooleanStrictOrNull() ?: false
-        )
-
-    suspend fun setAllowForegroundScheduledTask(enabled: Boolean) {
-        with(AppSettingsSchema) {
-            context.dataStore.edit { it[allowForegroundScheduledTask] = enabled.toString() }
-        }
-    }
-
-    // 定时任务触发时跳过锁屏检查
-    val runScheduleWhenLocked: StateFlow<Boolean> = settings
-        .map { it.runScheduleWhenLocked.toBooleanStrictOrNull() ?: false }
-        .distinctUntilChanged()
-        .stateIn(
-            scope, SharingStarted.Eagerly,
-            initialSettings.runScheduleWhenLocked.toBooleanStrictOrNull() ?: false
-        )
-
-    suspend fun setRunScheduleWhenLocked(enabled: Boolean) {
-        with(AppSettingsSchema) {
-            context.dataStore.edit { it[runScheduleWhenLocked] = enabled.toString() }
-        }
-    }
-
 
     // 是否启用系统莫奈主题色（Android 12+ Material You）
     private fun parseUseSystemMonetColor(raw: String): Boolean =
@@ -755,11 +690,13 @@ class AppSettingsManager(
 
     // ───────────────── 唤醒 + 解锁 ─────────────────
 
-    /** 解锁方式：none / swipe / pin */
     val wakeUnlockType: StateFlow<String> = settings
-        .map { it.wakeUnlockType }
+        .map {
+            val t = it.wakeUnlockType
+            if (t in WAKE_UNLOCK_TYPES) t else "swipe"
+        }
         .distinctUntilChanged()
-        .stateIn(scope, SharingStarted.Eagerly, initialSettings.wakeUnlockType)
+        .stateIn(scope, SharingStarted.Eagerly, "swipe")
 
     suspend fun setWakeUnlockType(type: String) {
         if (type !in WAKE_UNLOCK_TYPES) return
@@ -768,17 +705,55 @@ class AppSettingsManager(
         }
     }
 
-    /** 解锁 PIN，仅 wakeUnlockType = pin 时有意义。 */
     val wakeCredential: StateFlow<String> = settings
         .map { it.wakeCredential }
         .distinctUntilChanged()
         .stateIn(scope, SharingStarted.Eagerly, initialSettings.wakeCredential)
 
     suspend fun setWakeCredential(credential: String) {
-        // 注入走 KEYCODE_0..9，非数字没有对应键位
+        // 注入走 KEYCODE_0..9，仅保留数字
         val digits = credential.filter { it.isDigit() }.take(MAX_PIN_LENGTH)
         with(AppSettingsSchema) {
             context.dataStore.edit { it[wakeCredential] = digits }
+        }
+    }
+
+    val reportToPenguin: StateFlow<Boolean> = settings
+        .map { it.reportToPenguin.toBooleanStrictOrNull() ?: true }
+        .distinctUntilChanged()
+        .stateIn(
+            scope, SharingStarted.Eagerly,
+            initialSettings.reportToPenguin.toBooleanStrictOrNull() ?: true,
+        )
+
+    suspend fun setReportToPenguin(enabled: Boolean) {
+        with(AppSettingsSchema) {
+            context.dataStore.edit { it[reportToPenguin] = enabled.toString() }
+        }
+    }
+
+    val reportToYituliu: StateFlow<Boolean> = settings
+        .map { it.reportToYituliu.toBooleanStrictOrNull() ?: true }
+        .distinctUntilChanged()
+        .stateIn(
+            scope, SharingStarted.Eagerly,
+            initialSettings.reportToYituliu.toBooleanStrictOrNull() ?: true,
+        )
+
+    suspend fun setReportToYituliu(enabled: Boolean) {
+        with(AppSettingsSchema) {
+            context.dataStore.edit { it[reportToYituliu] = enabled.toString() }
+        }
+    }
+
+    val penguinId: StateFlow<String> = settings
+        .map { it.penguinId }
+        .distinctUntilChanged()
+        .stateIn(scope, SharingStarted.Eagerly, initialSettings.penguinId)
+
+    suspend fun setPenguinId(id: String) {
+        with(AppSettingsSchema) {
+            context.dataStore.edit { it[penguinId] = id.trim() }
         }
     }
 

@@ -25,6 +25,12 @@ object MaaApi {
         MAA_API_BACKUP
     )
 
+    // MaaMeow 静态 API 基础地址
+    const val MEOW_API_BASE = "https://maameow.com/api/"
+
+    // MaaMeow 公告
+    const val ANNOUNCEMENT_ZH = "${MEOW_API_BASE}announcement/announcement_zh.md"
+    const val ANNOUNCEMENT_EN = "${MEOW_API_BASE}announcement/announcement_en.md"
 
     // MirrorChyan 基础地址
     const val MIRROR_CHYAN_BASE = "https://mirrorchyan.com/"

@@ -7,7 +7,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
+import com.aliothmoon.maameow.theme.MaaAnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
@@ -37,9 +37,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
@@ -57,6 +61,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,6 +75,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
@@ -136,14 +143,13 @@ fun SettingsView(
     val shizukuShortcutEnabled by viewModel.shizukuShortcutEnabled.collectAsStateWithLifecycle()
     val shizukuLaunchPackage by viewModel.shizukuLaunchPackage.collectAsStateWithLifecycle()
     val deploymentWithPause by viewModel.deploymentWithPause.collectAsStateWithLifecycle()
+    val reportToPenguin by viewModel.reportToPenguin.collectAsStateWithLifecycle()
+    val reportToYituliu by viewModel.reportToYituliu.collectAsStateWithLifecycle()
+    val penguinId by viewModel.penguinId.collectAsStateWithLifecycle()
     val forceFullscreenOnVirtualDisplay by viewModel.forceFullscreenOnVirtualDisplay.collectAsStateWithLifecycle()
-    val driftAutoRepinEnabled by viewModel.driftAutoRepinEnabled.collectAsStateWithLifecycle()
-    val driftAutoRepinDelaySec by viewModel.driftAutoRepinDelaySec.collectAsStateWithLifecycle()
-    var showDriftDelayDialog by remember { mutableStateOf(false) }
-    val allowForegroundScheduledTask by viewModel.allowForegroundScheduledTask.collectAsStateWithLifecycle()
-    val runScheduleWhenLocked by viewModel.runScheduleWhenLocked.collectAsStateWithLifecycle()
-    // ─── 定时唤醒 + 解锁 ───
-    val wakeFeatureAvailable by viewModel.wakeFeatureAvailable.collectAsStateWithLifecycle()
+    val wakeUnlockType by viewModel.wakeUnlockType.collectAsStateWithLifecycle()
+    val wakeCredential by viewModel.wakeCredential.collectAsStateWithLifecycle()
+    val wakeTestState by viewModel.wakeTestState.collectAsStateWithLifecycle()
     val tasksOverrideEnabled by viewModel.tasksOverrideEnabled.collectAsStateWithLifecycle()
     val updateChannel by viewModel.updateChannel.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
@@ -187,6 +193,18 @@ fun SettingsView(
         }
     }
 
+    wakeTestState?.let { state ->
+        LaunchedEffect(state) {
+            val done = state as? SettingsViewModel.WakeTestState.Done ?: return@LaunchedEffect
+            Toast.makeText(
+                context,
+                done.result.message.resolve(context),
+                Toast.LENGTH_LONG,
+            ).show()
+            viewModel.clearWakeTestResult()
+        }
+    }
+
     pallasFlavorDialog?.let { flavor ->
         // 禁止点外部/返回立刻关掉：连点与弹窗同帧时容易穿透 dismiss
         val bodyRes = when (flavor) {
@@ -208,49 +226,6 @@ fun SettingsView(
             ),
         )
     }
-
-    if (showDriftDelayDialog) {
-        var delayInput by remember(showDriftDelayDialog) {
-            mutableStateOf(driftAutoRepinDelaySec.toString())
-        }
-        AlertDialog(
-            onDismissRequest = { showDriftDelayDialog = false },
-            title = { Text(stringResource(R.string.settings_drift_auto_repin_delay_sec)) },
-            text = {
-                Column {
-                    Text(
-                        stringResource(R.string.settings_drift_auto_repin_delay_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedTextField(
-                        value = delayInput,
-                        onValueChange = { s ->
-                            delayInput = s.filter { it.isDigit() }.take(2)
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = delayInput.toIntOrNull() in 1..60,
-                    onClick = {
-                        delayInput.toIntOrNull()?.let { viewModel.setDriftAutoRepinDelaySec(it) }
-                        showDriftDelayDialog = false
-                    }
-                ) { Text(stringResource(android.R.string.ok)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDriftDelayDialog = false }) {
-                    Text(stringResource(android.R.string.cancel))
-                }
-            }
-        )
-    }
-
 
     val backgroundCrop = rememberBackgroundCropController(viewModel)
     val pickBackgroundLauncher = rememberLauncherForActivityResult(
@@ -301,14 +276,13 @@ fun SettingsView(
 
     var showReInitConfirm by remember { mutableStateOf(false) }
     var showDebugModeConfirm by remember { mutableStateOf(false) }
+    var showForceFullscreenConfirm by remember { mutableStateOf(false) }
     var showExportSheet by remember { mutableStateOf(false) }
 
     LogExportController(
         sheetVisible = showExportSheet,
         onSheetDismiss = { showExportSheet = false },
     )
-    var showRunScheduleWhenLockedConfirm by remember { mutableStateOf(false) }
-
     if (showRestartDialog) {
         AdaptiveTaskPromptDialog(
             visible = true,
@@ -361,17 +335,17 @@ fun SettingsView(
         )
     }
 
-    if (showRunScheduleWhenLockedConfirm) {
+    if (showForceFullscreenConfirm) {
         AdaptiveTaskPromptDialog(
             visible = true,
-            title = stringResource(R.string.dialog_run_schedule_when_locked_title),
-            message = stringResource(R.string.dialog_run_schedule_when_locked_message),
+            title = stringResource(R.string.dialog_enable_force_fullscreen_title),
+            message = stringResource(R.string.dialog_enable_force_fullscreen_message),
             onConfirm = {
-                showRunScheduleWhenLockedConfirm = false
-                viewModel.setRunScheduleWhenLocked(true)
+                showForceFullscreenConfirm = false
+                viewModel.setForceFullscreenOnVirtualDisplay(true)
             },
-            onDismissRequest = { showRunScheduleWhenLockedConfirm = false },
-            confirmText = stringResource(R.string.dialog_run_schedule_when_locked_confirm),
+            onDismissRequest = { showForceFullscreenConfirm = false },
+            confirmText = stringResource(R.string.common_confirm),
             dismissText = stringResource(R.string.common_cancel),
             icon = Icons.Rounded.Build
         )
@@ -667,7 +641,7 @@ fun SettingsView(
                             onCheckedChange = { viewModel.setShizukuShortcutEnabled(it) }
                         )
                         ListItemDivider()
-                        AnimatedVisibility(
+                        MaaAnimatedVisibility(
                             visible = shizukuShortcutEnabled,
                             enter = expandVertically(),
                             exit = shrinkVertically()
@@ -724,100 +698,109 @@ fun SettingsView(
                     )
                     ListItemDivider()
                     SettingSwitchItem(
-                        title = stringResource(R.string.settings_deployment_with_pause),
-                        description = stringResource(R.string.settings_deployment_with_pause_tip),
-                        contentColor = contentColor,
-                        checked = deploymentWithPause,
-                        onCheckedChange = { viewModel.setDeploymentWithPause(it) }
-                    )
-                    ListItemDivider()
-                    SettingSwitchItem(
                         title = stringResource(R.string.settings_force_fullscreen_on_virtual_display),
+                        description = stringResource(R.string.settings_force_fullscreen_on_virtual_display_desc),
                         contentColor = contentColor,
                         checked = forceFullscreenOnVirtualDisplay,
-                        onCheckedChange = { viewModel.setForceFullscreenOnVirtualDisplay(it) }
-                    )
-                    ListItemDivider()
-                    SettingSwitchItem(
-                        title = stringResource(R.string.settings_drift_auto_repin_enabled),
-                        description = stringResource(R.string.settings_drift_auto_repin_enabled_desc),
-                        contentColor = contentColor,
-                        checked = driftAutoRepinEnabled,
-                        onCheckedChange = { viewModel.setDriftAutoRepinEnabled(it) }
-                    )
-                    AnimatedVisibility(
-                        visible = driftAutoRepinEnabled,
-                        enter = expandVertically(),
-                        exit = shrinkVertically()
-                    ) {
-                        Column {
-                            ListItemDivider()
-                            SettingClickItem(
-                                title = stringResource(R.string.settings_drift_auto_repin_delay_sec),
-                                description = stringResource(
-                                    R.string.settings_drift_auto_repin_delay_sec_desc,
-                                    driftAutoRepinDelaySec
-                                ),
-                                contentColor = contentColor
-                            ) {
-                                showDriftDelayDialog = true
-                            }
-                        }
-                    }
-                    ListItemDivider()
-                    SettingSwitchItem(
-                        title = stringResource(R.string.settings_allow_foreground_scheduled_task),
-                        contentColor = contentColor,
-                        checked = allowForegroundScheduledTask,
-                        onCheckedChange = { viewModel.setAllowForegroundScheduledTask(it) }
-                    )
-                    ListItemDivider()
-                    // 仅 Root 后端展示：其它后端下这个功能不可用，与其灰着再弹窗解释，
-                    // 不如不出现（弹窗那套还逼着 SettingSwitchItem 的禁用态可点，副作用更大）
-                    if (wakeFeatureAvailable) {
-                        SettingClickItem(
-                            title = stringResource(R.string.settings_wake_unlock_section),
-                            description = stringResource(R.string.settings_wake_unlock_section_desc),
-                            contentColor = contentColor,
-                            onClick = { navController.navigate(Routes.WAKE_SCHEDULE_EDITOR) }
-                        )
-                        ListItemDivider()
-                    }
-                    SettingSwitchItem(
-                        title = stringResource(R.string.settings_run_schedule_when_locked),
-                        contentColor = contentColor,
-                        checked = runScheduleWhenLocked,
                         onCheckedChange = { enabled ->
                             if (enabled) {
-                                showRunScheduleWhenLockedConfirm = true
+                                showForceFullscreenConfirm = true
                             } else {
-                                viewModel.setRunScheduleWhenLocked(false)
+                                viewModel.setForceFullscreenOnVirtualDisplay(false)
                             }
                         }
                     )
                     ListItemDivider()
-                    SettingSwitchItem(
-                        title = stringResource(R.string.settings_tasks_override_title),
-                        description = stringResource(R.string.settings_tasks_override_desc),
+                    SettingWakeUnlockTypeItem(
                         contentColor = contentColor,
-                        checked = tasksOverrideEnabled,
-                        onCheckedChange = { viewModel.setTasksOverrideEnabled(it) }
+                        selectedType = wakeUnlockType,
+                        onTypeSelected = { viewModel.setWakeUnlockType(it) },
                     )
-                    AnimatedVisibility(
-                        visible = tasksOverrideEnabled,
+                    MaaAnimatedVisibility(
+                        visible = wakeUnlockType == "pin",
                         enter = expandVertically(),
-                        exit = shrinkVertically()
+                        exit = shrinkVertically(),
                     ) {
                         Column {
                             ListItemDivider()
-                            SettingClickItem(
-                                title = stringResource(R.string.settings_tasks_override_edit_title),
-                                contentColor = contentColor
-                            ) {
-                                navController.navigate(Routes.TASK_OVERRIDE_EDITOR)
-                            }
+                            SettingWakePinSection(
+                                contentColor = contentColor,
+                                wakeCredential = wakeCredential,
+                                onCredentialChange = { viewModel.setWakeCredential(it) },
+                                onTest = { viewModel.runWakeTest() },
+                            )
                         }
                     }
+                    }
+                }
+            }
+
+            // 任务设置：暂停时部署干员、MAA 任务覆盖
+            item {
+                CollapsibleSection(
+                    title = stringResource(R.string.settings_section_task),
+                    sectionKey = "settings_section_task",
+                ) {
+                    SettingsGroupCard {
+                        SettingSwitchItem(
+                            title = stringResource(R.string.settings_deployment_with_pause),
+                            description = stringResource(R.string.settings_deployment_with_pause_tip),
+                            contentColor = contentColor,
+                            checked = deploymentWithPause,
+                            onCheckedChange = { viewModel.setDeploymentWithPause(it) }
+                        )
+                        ListItemDivider()
+                        SettingSwitchItem(
+                            title = stringResource(R.string.settings_report_penguin),
+                            description = stringResource(R.string.settings_report_penguin_desc),
+                            contentColor = contentColor,
+                            checked = reportToPenguin,
+                            onCheckedChange = { viewModel.setReportToPenguin(it) }
+                        )
+                        MaaAnimatedVisibility(
+                            visible = reportToPenguin || reportToYituliu,
+                            enter = expandVertically(),
+                            exit = shrinkVertically(),
+                        ) {
+                            Column {
+                                ListItemDivider()
+                                SettingPenguinIdField(
+                                    penguinId = penguinId,
+                                    onIdChange = { viewModel.setPenguinId(it) },
+                                )
+                            }
+                        }
+                        ListItemDivider()
+                        SettingSwitchItem(
+                            title = stringResource(R.string.settings_report_yituliu),
+                            description = stringResource(R.string.settings_report_yituliu_desc),
+                            contentColor = contentColor,
+                            checked = reportToYituliu,
+                            onCheckedChange = { viewModel.setReportToYituliu(it) }
+                        )
+                        ListItemDivider()
+                        SettingSwitchItem(
+                            title = stringResource(R.string.settings_tasks_override_title),
+                            description = stringResource(R.string.settings_tasks_override_desc),
+                            contentColor = contentColor,
+                            checked = tasksOverrideEnabled,
+                            onCheckedChange = { viewModel.setTasksOverrideEnabled(it) }
+                        )
+                        MaaAnimatedVisibility(
+                            visible = tasksOverrideEnabled,
+                            enter = expandVertically(),
+                            exit = shrinkVertically()
+                        ) {
+                            Column {
+                                ListItemDivider()
+                                SettingClickItem(
+                                    title = stringResource(R.string.settings_tasks_override_edit_title),
+                                    contentColor = contentColor
+                                ) {
+                                    navController.navigate(Routes.TASK_OVERRIDE_EDITOR)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -886,7 +869,7 @@ fun SettingsView(
                                     achievementViewModel.onEvent(AchievementEvent.PallasAvatarClicked)
                                 },
                             )
-                            AnimatedVisibility(
+                            MaaAnimatedVisibility(
                                 visible = achievementUiState.pallasDebugActive,
                                 enter = fadeIn() + expandVertically(),
                                 exit = fadeOut() + shrinkVertically(),
@@ -1017,79 +1000,73 @@ private fun SettingThemeSection(
     fontSizeScale: Int,
     onFontSizeScaleChanged: (Int) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = MaaDesignTokens.Spacing.listItemVertical),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // 标题
-        Text(
-            text = stringResource(R.string.settings_theme_title),
-            style = MaterialTheme.typography.bodyLarge,
-            color = contentColor
-        )
-        // 主题模式选择
-        Row(modifier = Modifier.fillMaxWidth()) {
-            val modes = listOf(
-                AppSettingsManager.ThemeMode.SYSTEM to stringResource(R.string.settings_theme_system),
-                AppSettingsManager.ThemeMode.WHITE to stringResource(R.string.settings_theme_white),
-                AppSettingsManager.ThemeMode.DARK to stringResource(R.string.settings_theme_dark),
-                AppSettingsManager.ThemeMode.PURE_DARK to stringResource(R.string.settings_theme_pure_dark)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = MaaDesignTokens.Spacing.listItemVertical),
+            verticalArrangement = Arrangement.spacedBy(MaaDesignTokens.Spacing.md),
+        ) {
+            Text(
+                text = stringResource(R.string.settings_theme_title),
+                style = MaterialTheme.typography.bodyLarge,
+                color = contentColor,
             )
-            modes.forEach { (mode, label) ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .selectable(
+            Row(modifier = Modifier.fillMaxWidth()) {
+                val modes = listOf(
+                    AppSettingsManager.ThemeMode.SYSTEM to stringResource(R.string.settings_theme_system),
+                    AppSettingsManager.ThemeMode.WHITE to stringResource(R.string.settings_theme_white),
+                    AppSettingsManager.ThemeMode.DARK to stringResource(R.string.settings_theme_dark),
+                    AppSettingsManager.ThemeMode.PURE_DARK to stringResource(R.string.settings_theme_pure_dark),
+                )
+                modes.forEach { (mode, label) ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .selectable(
+                                selected = mode == selectedMode,
+                                onClick = { onModeSelected(mode) },
+                                role = Role.RadioButton,
+                            ),
+                    ) {
+                        RadioButton(
                             selected = mode == selectedMode,
-                            onClick = { onModeSelected(mode) },
-                            role = Role.RadioButton
+                            onClick = null,
                         )
-                ) {
-                    RadioButton(
-                        selected = mode == selectedMode,
-                        onClick = null
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = contentColor,
-                        maxLines = 1
-                    )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = contentColor,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }
-        // 莫奈主题色（SDK >= S）
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.settings_monet_color_title),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = contentColor
+            ListItemDivider()
+            SettingRow(
+                title = stringResource(R.string.settings_monet_color_title),
+                description = stringResource(R.string.settings_monet_color_desc),
+                titleColor = contentColor,
+                descriptionColor = contentColor.copy(alpha = 0.7f),
+                trailing = {
+                    Switch(
+                        checked = useSystemMonetColor,
+                        onCheckedChange = onMonetColorChanged,
                     )
-                    Text(
-                        text = stringResource(R.string.settings_monet_color_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = contentColor.copy(alpha = 0.6f)
-                    )
-                }
-                Switch(checked = useSystemMonetColor, onCheckedChange = onMonetColorChanged)
-            }
+                },
+            )
         }
-        // 页面缩放
+        ListItemDivider()
         FontSizeSetting(
             contentColor = contentColor,
             value = fontSizeScale,
-            onValueChange = onFontSizeScaleChanged
+            onValueChange = onFontSizeScaleChanged,
         )
     }
 }
@@ -1108,6 +1085,151 @@ private fun SettingClickItem(
         descriptionColor = contentColor.copy(alpha = 0.7f),
         onClick = onClick,
     )
+}
+
+@Composable
+private fun SettingWakeUnlockTypeItem(
+    contentColor: Color,
+    selectedType: String,
+    onTypeSelected: (String) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = MaaDesignTokens.Spacing.listItemVertical),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.settings_wake_unlock_type),
+            style = MaterialTheme.typography.bodyLarge,
+            color = contentColor,
+            modifier = Modifier.weight(1f),
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val options = listOf(
+                "swipe" to stringResource(R.string.settings_wake_unlock_type_swipe),
+                "pin" to stringResource(R.string.settings_wake_unlock_type_pin),
+            )
+            options.forEach { (type, label) ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .selectable(
+                            selected = type == selectedType,
+                            onClick = { onTypeSelected(type) },
+                            role = Role.RadioButton,
+                        ),
+                ) {
+                    RadioButton(
+                        selected = type == selectedType,
+                        onClick = null,
+                    )
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = contentColor,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingPenguinIdField(
+    penguinId: String,
+    onIdChange: (String) -> Unit,
+) {
+    var localId by rememberSaveable { mutableStateOf(penguinId) }
+    LaunchedEffect(penguinId) {
+        if (penguinId != localId) localId = penguinId
+    }
+    OutlinedTextField(
+        value = localId,
+        onValueChange = { raw ->
+            localId = raw
+            onIdChange(raw)
+        },
+        label = { Text(stringResource(R.string.settings_penguin_id)) },
+        placeholder = { Text(stringResource(R.string.settings_penguin_id_hint)) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = MaaDesignTokens.Spacing.lg, vertical = 8.dp),
+    )
+}
+
+@Composable
+private fun SettingWakePinSection(
+    contentColor: Color,
+    wakeCredential: String,
+    onCredentialChange: (String) -> Unit,
+    onTest: () -> Unit,
+) {
+    var localPin by rememberSaveable { mutableStateOf(wakeCredential) }
+    var pinVisible by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(wakeCredential) {
+        if (wakeCredential != localPin) localPin = wakeCredential
+    }
+    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        OutlinedTextField(
+            value = localPin,
+            onValueChange = {
+                val digits = it.filter { c -> c.isDigit() }
+                    .take(AppSettingsManager.MAX_PIN_LENGTH)
+                localPin = digits
+                onCredentialChange(digits)
+            },
+            label = { Text(stringResource(R.string.settings_wake_credential)) },
+            placeholder = { Text(stringResource(R.string.settings_wake_credential_hint)) },
+            singleLine = true,
+            visualTransformation = if (pinVisible) {
+                VisualTransformation.None
+            } else {
+                PasswordVisualTransformation()
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            trailingIcon = {
+                IconButton(onClick = { pinVisible = !pinVisible }) {
+                    Icon(
+                        imageVector = if (pinVisible) {
+                            Icons.Filled.VisibilityOff
+                        } else {
+                            Icons.Filled.Visibility
+                        },
+                        contentDescription = stringResource(
+                            if (pinVisible) {
+                                R.string.settings_wake_credential_hide
+                            } else {
+                                R.string.settings_wake_credential_show
+                            },
+                        ),
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = stringResource(R.string.settings_wake_credential_warning),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+        )
+        SettingRow(
+            title = stringResource(R.string.settings_wake_test_button),
+            description = stringResource(R.string.settings_wake_test_hint),
+            titleColor = contentColor,
+            descriptionColor = contentColor.copy(alpha = 0.7f),
+            onClick = onTest,
+        )
+    }
 }
 
 @Composable
@@ -1135,7 +1257,7 @@ private fun SettingCustomBackgroundSection(
             onCheckedChange = onEnabledChange,
         )
 
-        AnimatedVisibility(
+        MaaAnimatedVisibility(
             visible = enabled,
             enter = expandVertically(),
             exit = shrinkVertically()

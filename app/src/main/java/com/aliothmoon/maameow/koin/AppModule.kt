@@ -1,5 +1,6 @@
 package com.aliothmoon.maameow.koin
 
+import com.aliothmoon.maameow.announcement.AnnouncementManager
 import com.aliothmoon.maameow.data.achievement.AchievementRepository
 import com.aliothmoon.maameow.data.api.CopilotApiService
 import com.aliothmoon.maameow.data.api.ETagCacheManager
@@ -21,6 +22,7 @@ import com.aliothmoon.maameow.data.notification.provider.DingTalkProvider
 import com.aliothmoon.maameow.data.notification.provider.DiscordProvider
 import com.aliothmoon.maameow.data.notification.provider.DiscordWebhookProvider
 import com.aliothmoon.maameow.data.notification.provider.GotifyProvider
+import com.aliothmoon.maameow.data.notification.provider.KookProvider
 import com.aliothmoon.maameow.data.notification.provider.NotificationProvider
 import com.aliothmoon.maameow.data.notification.provider.QmsgProvider
 import com.aliothmoon.maameow.data.notification.provider.ServerChanProvider
@@ -54,6 +56,8 @@ import com.aliothmoon.maameow.domain.service.MaaResourceLoader
 import com.aliothmoon.maameow.domain.service.MaaSessionLogger
 import com.aliothmoon.maameow.domain.service.RemoteAppAliveChecker
 import com.aliothmoon.maameow.domain.service.ResourceInitService
+import com.aliothmoon.maameow.domain.service.ScreenSaverController
+import com.aliothmoon.maameow.domain.service.TaskEndRegistry
 import com.aliothmoon.maameow.domain.service.ToolboxExportService
 import com.aliothmoon.maameow.domain.service.UnifiedStateDispatcher
 import com.aliothmoon.maameow.domain.service.update.UpdateService
@@ -61,6 +65,8 @@ import com.aliothmoon.maameow.domain.service.update.checker.AppVersionChecker
 import com.aliothmoon.maameow.domain.service.update.checker.ResourceVersionChecker
 import com.aliothmoon.maameow.maa.callback.ConnectionInfoHandler
 import com.aliothmoon.maameow.maa.callback.CopilotRuntimeStateStore
+import com.aliothmoon.maameow.data.api.GameDataReportService
+import com.aliothmoon.maameow.domain.service.GameDataReporter
 import com.aliothmoon.maameow.maa.callback.MaaCallbackDispatcher
 import com.aliothmoon.maameow.maa.callback.MaaExecutionStateHolder
 import com.aliothmoon.maameow.maa.callback.SubTaskHandler
@@ -74,17 +80,35 @@ import com.aliothmoon.maameow.overlay.OverlayController
 import com.aliothmoon.maameow.overlay.OverlayViewModelOwner
 import com.aliothmoon.maameow.overlay.border.BorderOverlayManager
 import com.aliothmoon.maameow.overlay.screensaver.ScreenSaverOverlayManager
+import android.app.KeyguardManager
+import android.content.Context
+import android.os.PowerManager
+import com.aliothmoon.maameow.domain.launch.CountdownUI
+import com.aliothmoon.maameow.domain.launch.LaunchMutex
+import com.aliothmoon.maameow.domain.launch.LaunchPipeline
+import com.aliothmoon.maameow.domain.launch.LaunchRequest
+import com.aliothmoon.maameow.domain.launch.StartTaskChainUseCase
+import com.aliothmoon.maameow.manager.RemoteServiceManager
+import com.aliothmoon.maameow.schedule.LaunchIntentMapper
 import com.aliothmoon.maameow.schedule.data.ScheduleStrategyRepository
-import com.aliothmoon.maameow.schedule.service.ForegroundScheduleStarter
+import com.aliothmoon.maameow.schedule.service.CountdownUIImpl
 import com.aliothmoon.maameow.schedule.service.ScheduleAlarmManager
 import com.aliothmoon.maameow.schedule.service.ScheduleTriggerLogger
 import com.aliothmoon.maameow.utils.CrashHandler
 import com.aliothmoon.maameow.utils.log.LogTreeHolder
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
+import org.koin.core.module.dsl.bind
 import org.koin.core.module.dsl.singleOf
+import org.koin.core.qualifier.named
 import org.koin.dsl.bind
+import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 
 val appModule = module {
 
@@ -99,8 +123,18 @@ val appModule = module {
     }
 
     singleOf(::HttpClientHelper)
+    single<GameDataReporter> {
+        GameDataReportService(
+            appContext = androidContext(),
+            httpClient = get(),
+            appSettings = get(),
+            taskChainState = get(),
+            sessionLogger = get(),
+        )
+    }
     singleOf(::ETagCacheManager)
     singleOf(::MaaApiService)
+    singleOf(::AnnouncementManager)
     singleOf(::PermissionManager)
     singleOf(::ShizukuReadinessProvider)
 
@@ -112,6 +146,56 @@ val appModule = module {
     singleOf(::ScheduleStrategyRepository)
     singleOf(::ScheduleTriggerLogger)
     singleOf(::ScheduleAlarmManager)
+    singleOf(::LaunchMutex)
+    singleOf(::StartTaskChainUseCase)
+    single(named("launchPipeline")) {
+        CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    }
+    single<CountdownUI> {
+        CountdownUIImpl(
+            overlayController = get(),
+            onUserEvent = { event -> get<LaunchPipeline>().submit(event) },
+        )
+    }
+    single {
+        val appContext = get<Context>()
+        LaunchPipeline(
+            scope = get(named("launchPipeline")),
+            mutex = get(),
+            appSettingsManager = get(),
+            wakeUnlockEngine = get(),
+            chainState = get(),
+            compositionService = get(),
+            triggerLogger = get(),
+            scheduleRepository = get(),
+            startTaskChain = get(),
+            countdownUI = get(),
+            screenSaver = get(),
+            taskEndRegistry = get(),
+            keyguardLocked = {
+                val km = appContext.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+                km.isKeyguardLocked
+            },
+            deviceLocked = {
+                val km = appContext.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+                km.isDeviceLocked
+            },
+            screenInteractive = {
+                val pm = appContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+                pm.isInteractive
+            },
+            activityLauncher = { request: LaunchRequest ->
+                withTimeoutOrNull(10.seconds) {
+                    runCatching {
+                        RemoteServiceManager.useRemoteService(timeoutMs = 8_000L) {
+                            it.startActivity(LaunchIntentMapper.toShowIntent(appContext, request))
+                        }
+                        true
+                    }.getOrDefault(false)
+                } ?: false
+            },
+        )
+    }
     singleOf(::TaskChainState)
     singleOf(::ConfigBackupManager)
     singleOf(::MaaPathConfig)
@@ -139,6 +223,7 @@ val appModule = module {
     single { TelegramProvider(get(), get()) } bind NotificationProvider::class
     single { DiscordProvider(get(), get()) } bind NotificationProvider::class
     single { DingTalkProvider(get(), get()) } bind NotificationProvider::class
+    single { KookProvider(get(), get()) } bind NotificationProvider::class
     single { DiscordWebhookProvider(get(), get()) } bind NotificationProvider::class
     single { SmtpProvider(get()) } bind NotificationProvider::class
     single { BarkProvider(get(), get()) } bind NotificationProvider::class
@@ -174,12 +259,14 @@ val appModule = module {
     singleOf(::WakeUnlockEngine)
 
     singleOf(::UnifiedStateDispatcher)
+    // scope 走构造默认值，singleOf 会试图解析它
+    single { TaskEndRegistry(compositionService = get()) }
     singleOf(::LogExportService)
     singleOf(::ToolboxExportService)
 
 
     singleOf(::BorderOverlayManager)
-    singleOf(::ScreenSaverOverlayManager)
+    singleOf(::ScreenSaverOverlayManager) { bind<ScreenSaverController>() }
     singleOf(::OverlayViewModelOwner)
     singleOf(::OverlayController)
 
@@ -197,5 +284,4 @@ val appModule = module {
     singleOf(::LogTreeHolder)
 
     // 前台模式自动任务
-    singleOf(::ForegroundScheduleStarter)
 }

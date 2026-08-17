@@ -9,25 +9,33 @@ import org.junit.Test
 class UiScaleTest {
 
     @Test
-    fun recommended_bySmallestWidth() {
-        assertEquals(85, UiScale.recommendedFontSizeScale(320, 1f))
-        assertEquals(90, UiScale.recommendedFontSizeScale(350, 1f))
-        assertEquals(95, UiScale.recommendedFontSizeScale(380, 1f))
+    fun recommended_360AndWider_is100() {
+        assertEquals(100, UiScale.recommendedFontSizeScale(360, 1f))
+        assertEquals(100, UiScale.recommendedFontSizeScale(393, 1f))
         assertEquals(100, UiScale.recommendedFontSizeScale(411, 1f))
         assertEquals(100, UiScale.recommendedFontSizeScale(600, 1f))
+        assertEquals(100, UiScale.recommendedFontSizeScale(0, 1f))
     }
 
     @Test
-    fun recommended_smallSystemFont_canBump() {
-        // sw 411 base 100 + small font → 105
-        assertEquals(105, UiScale.recommendedFontSizeScale(411, 0.85f))
+    fun recommended_narrowerThan360_lerpsTo95() {
+        assertEquals(95, UiScale.recommendedFontSizeScale(320, 1f))
+        assertEquals(95, UiScale.recommendedFontSizeScale(280, 1f))
+        assertEquals(98, UiScale.recommendedFontSizeScale(344, 1f))
+        assertEquals(99, UiScale.recommendedFontSizeScale(352, 1f))
     }
 
     @Test
-    fun recommended_largeSystemFont_doesNotShrink() {
-        // 大字不反向压低推荐（无障碍）
-        assertEquals(100, UiScale.recommendedFontSizeScale(411, 1.5f))
-        assertEquals(90, UiScale.recommendedFontSizeScale(350, 1.5f))
+    fun recommended_systemFontDoesNotShrinkTypicalPhones() {
+        assertEquals(100, UiScale.recommendedFontSizeScale(411, 0.85f))
+        assertEquals(100, UiScale.recommendedFontSizeScale(411, 1.15f))
+        assertEquals(100, UiScale.recommendedFontSizeScale(411, 1.8f))
+    }
+
+    @Test
+    fun recommended_largeFontOnNarrowScreen_onlyNudge() {
+        assertEquals(90, UiScale.recommendedFontSizeScale(320, 1.5f))
+        assertEquals(93, UiScale.recommendedFontSizeScale(344, 1.5f))
     }
 
     @Test
@@ -62,7 +70,7 @@ class UiScaleTest {
     @Test
     fun resolveFontSizeScale_autoUsesRecommendation() {
         assertEquals(
-            85,
+            95,
             AppSettingsManager.resolveFontSizeScale(
                 stored = AppSettingsManager.FONT_SIZE_SCALE_AUTO,
                 smallestWidthDp = 320,

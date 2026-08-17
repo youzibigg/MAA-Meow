@@ -1,7 +1,6 @@
 package com.aliothmoon.maameow.schedule.ui
 
 import android.content.Intent
-import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,7 +8,9 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -69,6 +70,7 @@ import com.aliothmoon.maameow.presentation.components.TopAppBar
 import com.aliothmoon.maameow.presentation.components.tip.ExpandableTipContent
 import com.aliothmoon.maameow.presentation.components.tip.ExpandableTipIcon
 import com.aliothmoon.maameow.schedule.model.ScheduleType
+import com.aliothmoon.maameow.schedule.service.ExactAlarmSettings
 import com.aliothmoon.maameow.theme.MaaDesignTokens
 import com.aliothmoon.maameow.utils.i18n.asString
 import com.dokar.sonner.ToastType
@@ -178,6 +180,7 @@ fun ScheduleEditView(
             }
 
             item {
+                Spacer(Modifier.height(MaaDesignTokens.Spacing.sectionGap))
                 SectionHeader(stringResource(R.string.schedule_section_type))
             }
             item {
@@ -209,6 +212,7 @@ fun ScheduleEditView(
             when (state.scheduleType) {
                 ScheduleType.FIXED_TIME -> {
                     item {
+                        Spacer(Modifier.height(MaaDesignTokens.Spacing.sectionGap))
                         SectionHeader(stringResource(R.string.schedule_section_days))
                     }
                     item {
@@ -240,6 +244,7 @@ fun ScheduleEditView(
                     }
 
                     item {
+                        Spacer(Modifier.height(MaaDesignTokens.Spacing.sectionGap))
                         SectionHeader(stringResource(R.string.schedule_section_times))
                     }
                     item {
@@ -291,6 +296,7 @@ fun ScheduleEditView(
 
                 ScheduleType.INTERVAL -> {
                     item {
+                        Spacer(Modifier.height(MaaDesignTokens.Spacing.sectionGap))
                         SectionHeader(stringResource(R.string.schedule_section_start_time))
                     }
                     item {
@@ -373,6 +379,7 @@ fun ScheduleEditView(
                     }
 
                     item {
+                        Spacer(Modifier.height(MaaDesignTokens.Spacing.sectionGap))
                         SectionHeader(stringResource(R.string.schedule_section_interval))
                     }
                     item {
@@ -423,6 +430,7 @@ fun ScheduleEditView(
             }
 
             item {
+                Spacer(Modifier.height(MaaDesignTokens.Spacing.sectionGap))
                 SectionHeader(stringResource(R.string.schedule_section_task_config))
             }
             item {
@@ -460,13 +468,14 @@ fun ScheduleEditView(
                             text = stringResource(R.string.schedule_enabled_tasks, enabledTasks),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)
+                            modifier = Modifier.padding(top = MaaDesignTokens.Spacing.sm)
                         )
                     }
                 }
             }
 
             item {
+                Spacer(Modifier.height(MaaDesignTokens.Spacing.sectionGap))
                 SectionHeader(stringResource(R.string.schedule_section_advanced))
                 val (expanded, setExpanded) = remember { mutableStateOf(false) }
                 Row(
@@ -499,11 +508,8 @@ fun ScheduleEditView(
                 )
             }
 
-            // ─── 唤醒+解锁 ───
             item {
-                SectionHeader(stringResource(R.string.schedule_section_wake_unlock))
-                val (wakeExpanded, setWakeExpanded) = remember { mutableStateOf(false) }
-                val wakeConfigured = state.wakeUnlockConfigured
+                val (saverExpanded, setSaverExpanded) = remember { mutableStateOf(false) }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth(),
@@ -515,28 +521,22 @@ fun ScheduleEditView(
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(
-                            stringResource(R.string.schedule_wake_unlock_enabled),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (wakeConfigured) MaterialTheme.colorScheme.onSurface
-                            else MaterialTheme.colorScheme.onSurfaceVariant
+                            stringResource(R.string.schedule_auto_screen_saver),
+                            style = MaterialTheme.typography.bodyLarge
                         )
                         ExpandableTipIcon(
                             modifier = Modifier.padding(start = 8.dp),
-                            expanded = wakeExpanded,
-                            onExpandedChange = { setWakeExpanded(it) })
+                            expanded = saverExpanded,
+                            onExpandedChange = { setSaverExpanded(it) })
                     }
                     Switch(
-                        checked = state.wakeUnlockEnabled,
-                        onCheckedChange = { viewModel.onWakeUnlockEnabledChanged(it) },
-                        enabled = wakeConfigured
+                        checked = state.autoScreenSaver,
+                        onCheckedChange = { viewModel.onAutoScreenSaverChanged(it) }
                     )
                 }
                 ExpandableTipContent(
-                    visible = wakeExpanded,
-                    tipText = if (wakeConfigured)
-                        stringResource(R.string.schedule_wake_unlock_tip)
-                    else
-                        stringResource(R.string.schedule_wake_unlock_not_configured),
+                    visible = saverExpanded,
+                    tipText = stringResource(R.string.schedule_auto_screen_saver_tip),
                 )
             }
 
@@ -569,6 +569,82 @@ fun ScheduleEditView(
                 ExpandableTipContent(
                     visible = sleepExpanded,
                     tipText = stringResource(R.string.schedule_auto_sleep_tip),
+                )
+                // 从属于上面的开关，关掉就没有意义，直接隐藏
+                if (state.autoSleepAfterTask) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 24.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.schedule_skip_auto_sleep_if_awake),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                stringResource(R.string.schedule_skip_auto_sleep_if_awake_tip),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = state.skipAutoSleepIfAwake,
+                            onCheckedChange = { viewModel.onSkipAutoSleepIfAwakeChanged(it) }
+                        )
+                    }
+                }
+            }
+
+            item {
+                // 优先级规则容易踩坑，默认展开
+                val (closeExpanded, setCloseExpanded) = remember { mutableStateOf(true) }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            stringResource(R.string.schedule_close_game_after_task),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        ExpandableTipIcon(
+                            modifier = Modifier.padding(start = 8.dp),
+                            expanded = closeExpanded,
+                            onExpandedChange = { setCloseExpanded(it) })
+                    }
+                    Switch(
+                        checked = state.closeGameAfterTask,
+                        onCheckedChange = { viewModel.onCloseGameAfterTaskChanged(it) }
+                    )
+                }
+                val closeEffect by viewModel.closeGameEffect.collectAsStateWithLifecycle()
+                val willClose = closeEffect == CloseGameEffect.GlobalOverride
+                        || closeEffect == CloseGameEffect.StrategyActive
+                Text(
+                    text = stringResource(
+                        when (closeEffect) {
+                            CloseGameEffect.ForegroundInactive -> R.string.schedule_close_game_effect_foreground
+                            CloseGameEffect.GlobalOverride -> R.string.schedule_close_game_effect_global
+                            CloseGameEffect.StrategyActive -> R.string.schedule_close_game_effect_strategy
+                            CloseGameEffect.Inactive -> R.string.schedule_close_game_effect_inactive
+                        }
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (willClose) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = MaaDesignTokens.Spacing.sm)
+                )
+                ExpandableTipContent(
+                    visible = closeExpanded,
+                    tipText = stringResource(R.string.schedule_close_game_tip),
                 )
             }
         }
@@ -621,12 +697,8 @@ fun ScheduleEditView(
                                 )
                             )
                         }
-                    } else if (state.needExactAlarm && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        runCatching {
-                            context.startActivity(
-                                Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
-                            )
-                        }
+                    } else if (state.needExactAlarm) {
+                        ExactAlarmSettings.open(context)
                     }
                     showPermissionDialog = false
                     navController.popBackStack()

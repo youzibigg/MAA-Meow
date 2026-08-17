@@ -50,6 +50,7 @@
     <string name="settings_debug_mode_desc">Record detailed log information when enabled</string>
     <string name="settings_section_display">Display</string>
     <string name="settings_section_other">Other</string>
+    <string name="settings_section_task">Task Settings</string>
     <string name="settings_startup_backend_title">Startup Mode</string>
     <string name="settings_startup_backend_desc">Choose how the app obtains system permissions</string>
     <!-- settings: monet theme color (system Material You toggle, Android 12+) -->
@@ -66,7 +67,7 @@
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_theme_pure_dark">Pure Black</string>
     <string name="settings_font_size_title">Page Scale</string>
-    <string name="settings_font_size_summary">Scales the whole UI (including spacing). Default is automatic by screen size; system font size still applies. Main app and floating panel both follow this setting.</string>
+    <string name="settings_font_size_summary">Scales the whole UI (including spacing). Auto matches typical phone width; system font size applies separately. Main app and floating panel both follow this setting.</string>
     <string name="settings_font_size_preview_text">Who are you? Please support Pallas! (\'- \' )</string>
     <string name="settings_font_size_auto_value">Auto · %1$d</string>
     <string name="settings_font_size_use_recommended">Use auto (recommended)</string>
@@ -105,17 +106,20 @@
     <string name="settings_shizuku_launch_app_empty">No matching apps found</string>
     <string name="settings_deployment_with_pause">Deploy operators while paused</string>
     <string name="settings_deployment_with_pause_tip">Hold ESC to pause the game while deploying operators for higher precision. Disable if ESC injection misbehaves or some operators are not placed correctly; deployment will fall back to plain swipe</string>
-    <string name="settings_force_fullscreen_on_virtual_display">Force FULLSCREEN mode</string>
-    <string name="settings_drift_auto_repin_enabled">Move game back automatically</string>
-    <string name="settings_drift_auto_repin_enabled_desc">In background mode, some systems (e.g. Samsung One UI) or channel-login SDKs may move the game back to the main screen, breaking recognition. When enabled, the game is moved back to the virtual display once it has been away longer than the configured delay</string>
-    <string name="settings_drift_auto_repin_delay_sec">Move-back delay</string>
-    <string name="settings_drift_auto_repin_delay_sec_desc">Wait %1$d seconds after the game leaves the virtual display before moving it back, to avoid interrupting login or verification pop-ups</string>
-    <string name="settings_drift_auto_repin_delay_hint">Unit: seconds, range 1~60</string>
-    <string name="settings_allow_foreground_scheduled_task">Allow scheduled tasks in foreground</string>
-    <string name="settings_run_schedule_when_locked">Skip lock screen check for scheduled tasks</string>
-    <string name="dialog_run_schedule_when_locked_title">Experimental feature</string>
-    <string name="dialog_run_schedule_when_locked_message">Skipping the lock screen check is experimental and not guaranteed to work on all devices. Please verify it works on your device.</string>
-    <string name="dialog_run_schedule_when_locked_confirm">Enable anyway</string>
+    <string name="settings_force_fullscreen_on_virtual_display">Force fullscreen in background mode</string>
+    <string name="settings_force_fullscreen_on_virtual_display_desc">Applies to the background virtual display only. May not take effect on all devices and can cause extra issues</string>
+    <string name="dialog_enable_force_fullscreen_title">Enable background force fullscreen?</string>
+    <string name="dialog_enable_force_fullscreen_message">This may not work on every device and can cause compatibility issues. Continue?</string>
+    <string name="settings_wake_unlock_type">Schedule unlock method</string>
+    <string name="settings_wake_unlock_type_swipe">Swipe unlock</string>
+    <string name="settings_wake_unlock_type_pin">PIN</string>
+    <string name="settings_report_penguin">Report to Penguin Statistics</string>
+    <string name="settings_report_penguin_desc">Upload battle drops and recruit tags to penguin-stats</string>
+    <string name="settings_report_yituliu">Report to Yituliu</string>
+    <string name="settings_report_yituliu_desc">Upload drops and recruit results to Yituliu</string>
+    <string name="settings_penguin_id">Penguin Statistics ID</string>
+    <string name="settings_penguin_id_hint">Digits only; leave empty to let the server assign one</string>
+    <string name="report_http_failed">Failed to report, abort upload to Penguin Statistics</string>
     <string name="settings_tasks_override_title">MAA Task Override</string>
     <string name="settings_tasks_override_desc">Do not modify unless you know what you are doing — incorrect values will break MAA</string>
     <string name="settings_tasks_override_edit_title">Edit Config JSON</string>
@@ -341,6 +345,9 @@
     <string name="copilot_task_name_empty">Copilot jobs with empty names exist</string>
     <string name="copilot_single_list_warning">You\'re using \";Battle list\"; to execute a single task, which is not recommended. For single tasks, run them directly instead.</string>
     <string name="copilot_unsupported_stage">Unsupported stage %1$s. If this is a stage from a new event, please wait for the map resource update before using auto-combat</string>
+    <string name="copilot_unsupported_skill">%1$s does not support skill %2$d, skill selection disabled</string>
+    <string name="copilot_elite_filled">%1$s has no elite requirement, but other requirements need E%2$d; filled in automatically</string>
+    <string name="copilot_elite_raised">%1$s requires E%2$d, but other requirements need E%3$d; adjusted automatically</string>
     <string name="copilot_invalid_operator">Invalid operator: %1$s</string>
     <string name="copilot_status_completed">Completed: %1$s</string>
     <string name="copilot_rate_failed">An error occurred, the like failed: &lt;</string>
@@ -365,7 +372,7 @@
     <!-- task action buttons -->
     <string name="task_btn_start">Start Task</string>
     <string name="task_btn_stop">Stop Task</string>
-    <string name="task_more_actions_cd">More actions</string>
+    <string name="task_btn_quick_options">Options</string>
     <string name="task_close_preview_cd">Close preview</string>
 
     <!-- dialog: close app confirm -->
@@ -413,6 +420,8 @@
 
     <!-- update cdk input -->
     <string name="update_cdk_label">Mirrorchyan CDK</string>
+    <string name="update_cdk_saved">Saved</string>
+    <string name="update_cdk_unset">Not set</string>
     <string name="update_cdk_placeholder">Enter CDK</string>
     <string name="update_cdk_clear_cd">Clear</string>
     <string name="update_cdk_show_cd">Show</string>
@@ -816,7 +825,7 @@
     <string name="panel_infrast_scheduler_builder">Custom Base JSON Generator</string>
     <string name="panel_infrast_import_background_only">Please import custom configuration files in background mode.</string>
     <string name="panel_infrast_presets_title">Default Base infrastructure</string>
-    <string name="panel_infrast_preset_user_defined">User defined</string>
+    <string name="panel_infrast_preset_user_defined">Tap to choose custom file</string>
     <string name="panel_infrast_preset_153_3x">153 3 times a day</string>
     <string name="panel_infrast_preset_153_4x">153 4 times a day</string>
     <string name="panel_infrast_preset_243_3x">243 3 times a day</string>
@@ -882,6 +891,41 @@
     <string name="toolbox_tab_mini_game">Useful Tasks</string>
     <string name="toolbox_tab_gacha">Gacha</string>
     <string name="toolbox_tab_recruit_calc">Recruitment</string>
+    <string name="pixel_art_group_image">Image</string>
+    <string name="pixel_art_group_fit">Fit</string>
+    <string name="pixel_art_group_dither">Dither</string>
+    <string name="pixel_art_group_output">Output</string>
+    <string name="pixel_art_pick_image">Pick image</string>
+    <string name="pixel_art_pick_in_app">Picking an image is unavailable in the floating window, please use the app UI</string>
+    <string name="pixel_art_fit_crop">Crop</string>
+    <string name="pixel_art_fit_contain">Contain</string>
+    <string name="pixel_art_fit_stretch">Stretch</string>
+    <string name="pixel_art_dither_none">No dither</string>
+    <string name="pixel_art_dither_fs">Floyd–Steinberg</string>
+    <string name="pixel_art_dither_atkinson">Atkinson</string>
+    <string name="pixel_art_brightness">Brightness</string>
+    <string name="pixel_art_contrast">Contrast</string>
+    <string name="pixel_art_saturation">Saturation</string>
+    <string name="pixel_art_trim_border">Trim empty border</string>
+    <string name="pixel_art_skip_white">Skip white cells</string>
+    <string name="pixel_art_swipe">Swipe painting</string>
+    <string name="pixel_art_swipe_tip">Paints a run of same-colored cells in one swipe, noticeably faster. Turn it off if cells get skipped</string>
+    <string name="pixel_art_grid_click_delay">Click delay</string>
+    <string name="pixel_art_grid_click_delay_value">%1$d ms</string>
+    <string name="pixel_art_grid_click_delay_tip">Extra wait between cell clicks. 0 works by default; raise it if a low-end device skips cells. With swipe drawing on, each run waits twice</string>
+    <string name="pixel_art_reset_view">Reset view</string>
+    <string name="pixel_art_reset_params">Reset params</string>
+    <string name="pixel_art_view_hint">Drag to pan, pinch to zoom the preview</string>
+    <string name="pixel_art_locked">Running, parameters locked</string>
+    <string name="pixel_art_cell_count">%1$d cells / %2$d colors</string>
+    <string name="pixel_art_progress">Filled %1$d/%2$d cells</string>
+    <string name="pixel_art_log_done">Pixel art finished</string>
+    <string name="pixel_art_need_image">Please pick an image first</string>
+    <string name="pixel_art_nothing_to_paint">Nothing to paint</string>
+    <string name="pixel_art_status_decoding">Decoding image…</string>
+    <string name="pixel_art_status_decode_failed">Failed to decode image</string>
+    <string name="pixel_art_status_started">Pixel art started: %1$d cells, %2$d colors</string>
+    <string name="pixel_art_hint">Stay on the in-game pixel art editor with the canvas zoomed all the way out. Do not touch the screen while it runs</string>
     <string name="toolbox_status_starting_gacha">Starting gacha…</string>
     <string name="toolbox_status_gacha_started">Gacha started</string>
     <string name="gacha_once">Gacha Once</string>
@@ -960,6 +1004,7 @@
     <string name="mini_game_tip_ra_store">Please start from the event shop page.</string>
     <string name="mini_game_name_secret_front">Hidden Front</string>
     <string name="mini_game_tip_secret_front">Start from the squad selection screen;\nIf there is a saved game, please delete it manually.\nClose the tutorial after playing it for the first time.\nRecommended to enable in-game ｢Inherit previous squad\'s data｣.</string>
+    <string name="mini_game_tip_pixel_paint">Pick an image and tune it below, then stay on the in-game pixel art editor before starting</string>
     <string name="mini_game_name_pv">PV - Fireworks Organizing Committee</string>
     <string name="mini_game_tip_pv">Automatically clear from the selected stage. If you choose the first stage, start from the leftmost side of the event page; for other stages, enter the previous stage and then return to calibrate the position.</string>
     <string name="mini_game_name_spa">Stronghold Protocol: Alliance</string>
@@ -1055,6 +1100,24 @@
     <string name="panel_depot_preset_lmd">LMD</string>
     <string name="panel_depot_preset_certificate">Purchase Certificates</string>
     <string name="panel_depot_preset_skill_summary">Skill Summary - III</string>
+    <string name="panel_depot_preset_plan_count">%1$d plans</string>
+    <string name="panel_depot_preset_apply">Add</string>
+    <string name="panel_depot_clear_plans">Clear</string>
+    <string name="panel_depot_clear_plans_confirm">Clear all %1$d plans? This cannot be undone.</string>
+    <string name="panel_depot_group_task_behavior">Task behavior</string>
+    <string name="panel_depot_group_stage_battle">Stage &amp; battle</string>
+    <string name="panel_depot_group_sanity">Sanity recovery</string>
+    <string name="panel_depot_enable_use_medicine">Enable the "Use sanity potions" checkbox</string>
+    <string name="panel_depot_enable_use_stone">Enable the "Use Originium" checkbox</string>
+    <string name="panel_depot_use_expiring_medicine">Use sanity potions expiring within 48 hours</string>
+    <string name="panel_depot_use_expiring_medicine_tip">Applies to all plans with a fixed 48-hour threshold; independent of the similarly named option in the Fight task, whose threshold is adjustable</string>
+    <string name="panel_depot_summary_title">Plan overview</string>
+    <string name="panel_depot_summary_runnable">%1$d / %2$d will run</string>
+    <string name="panel_depot_summary_no_item">No item</string>
+    <string name="panel_depot_summary_zero_target">Target is 0</string>
+    <string name="panel_depot_summary_stage_required">Stage required</string>
+    <string name="panel_depot_summary_stage_closed">Closed today</string>
+    <string name="panel_depot_summary_enough">Target met</string>
     <string name="panel_depot_target_inventory">Target inventory</string>
     <string name="panel_depot_stone_count">Use up to N Originite Prime</string>
     <string name="panel_depot_not_selected">Not selected</string>
@@ -1286,6 +1349,7 @@
     <string name="notification_provider_telegram">Telegram</string>
     <string name="notification_provider_discord">Discord</string>
     <string name="notification_provider_ding_talk">DingTalk</string>
+    <string name="notification_provider_kook">KOOK Bot</string>
     <string name="notification_provider_discord_webhook">Discord Webhook</string>
     <string name="notification_provider_smtp">SMTP</string>
     <string name="notification_provider_bark">Bark</string>
@@ -1301,6 +1365,9 @@
     <string name="notification_placeholder_optional">Optional</string>
     <string name="notification_label_user_id">User ID</string>
     <string name="notification_label_access_token">Access Token</string>
+    <string name="notification_label_kook_target_id">Channel ID / User ID</string>
+    <string name="notification_placeholder_kook_target_id">User ID for direct messages, channel ID otherwise</string>
+    <string name="notification_kook_direct_message">Send as direct message</string>
     <string name="notification_label_secret">Secret</string>
     <string name="notification_placeholder_optional_signing_secret">Optional, signing secret</string>
     <string name="notification_label_webhook_url">Webhook URL</string>
@@ -1345,6 +1412,9 @@
     <string name="notification_err_bark_server_empty">Bark server address is not set</string>
     <string name="notification_err_bark_key_empty">Bark SendKey is not set</string>
     <string name="notification_err_dingtalk_token_empty">DingTalk access_token is not set</string>
+    <string name="notification_err_kook_token_empty">KOOK Bot Token is not set</string>
+    <string name="notification_err_kook_target_empty">KOOK channel ID or user ID is not set</string>
+    <string name="notification_err_kook_api">KOOK API error %1$d: %2$s</string>
     <string name="notification_err_discord_token_empty">Discord Bot Token is not set</string>
     <string name="notification_err_discord_user_empty">Discord user ID is not set</string>
     <string name="notification_err_discord_dm_failed">Failed to create Discord DM channel</string>
@@ -1413,8 +1483,10 @@
     <string name="task_start_error_maa_create_instance">MaaCore initialization failed. Restart the app</string>
     <string name="task_start_error_set_touch_mode">Failed to set touch mode. Restart the app</string>
     <string name="task_start_error_portrait_orientation">The screen is in portrait mode. Switch to landscape before starting</string>
+    <string name="task_start_error_invalid_aspect_ratio">Current resolution is not 16:9. Adjust resolution or use background mode</string>
     <string name="task_start_error_display_mode">Failed to set display mode. Please try again</string>
     <string name="task_start_error_virtual_display">Failed to start the virtual display. Check service permissions</string>
+    <string name="task_start_error_virtual_display_shizuku_as_root">Failed to start the virtual display: Shizuku is running as root. Please switch to the built-in Root mode instead of starting Shizuku with root</string>
     <string name="task_start_error_connect_timeout">Timed out while starting MaaCore. Please try again</string>
     <string name="task_start_error_start_failed">MaaCore failed to start. Check the task configuration</string>
     <string name="task_start_success">MAA started successfully</string>
@@ -1446,7 +1518,11 @@
     <string name="schedule_trigger_log_title">Trigger log</string>
     <string name="schedule_create_strategy">New schedule</string>
     <string name="schedule_empty_state">No schedules yet</string>
-    <string name="schedule_empty_hint_add">Tap the button in the lower-right corner to add one</string>
+    <string name="schedule_empty_hint_add">Tap the button in the upper-right corner to add one</string>
+    <string name="schedule_exact_alarm_blocked">Exact alarms are not allowed</string>
+    <string name="schedule_exact_alarm_hint">Schedules still fire on time, but the status bar shows an alarm icon</string>
+    <string name="schedule_exact_alarm_grant">Allow</string>
+    <string name="schedule_exact_alarm_settings">Exact alarm settings</string>
     <string name="schedule_delete_strategy_title">Delete schedule</string>
     <string name="schedule_delete_strategy_message">Delete this schedule?</string>
     <string name="schedule_auto_start_permission_title">Auto-start permission</string>
@@ -1480,12 +1556,18 @@
     <string name="schedule_section_advanced">Advanced options</string>
     <string name="schedule_force_start">Force scheduled start</string>
     <string name="schedule_force_start_tip">Stop the current task, restart the game, and start the new tasks</string>
-    <string name="schedule_section_wake_unlock">Wake &amp; Unlock</string>
-    <string name="schedule_wake_unlock_enabled">Enable wake &amp; unlock</string>
-    <string name="schedule_wake_unlock_tip">Wake the screen and unlock before the scheduled task starts. Requires unlock method configured in Settings.</string>
-    <string name="schedule_wake_unlock_not_configured">Configure unlock method in Settings → Wake Unlock Config first</string>
+    <string name="schedule_auto_screen_saver">Enable screen saver while running</string>
+    <string name="schedule_auto_screen_saver_tip">Background mode only. Enables a dark screen saver at minimum brightness before the countdown starts, and turns it off when the task ends. It is skipped if you are already using the device (screen on and unlocked) at trigger time</string>
     <string name="schedule_auto_sleep_after_task">Auto sleep after task</string>
     <string name="schedule_auto_sleep_tip">Automatically turn off the screen after the scheduled task completes to save battery</string>
+    <string name="schedule_skip_auto_sleep_if_awake">Skip if screen was already on</string>
+    <string name="schedule_skip_auto_sleep_if_awake_tip">If the screen is already on and not showing the lock screen when the task triggers, assume you are using the phone and leave it on</string>
+    <string name="schedule_close_game_after_task">Close game after task</string>
+    <string name="schedule_close_game_tip">Background mode only. If "Tasks → Options → Close game when task ends" is already enabled, that switch takes precedence; this strategy setting applies only when it is off. Manually stopping a task will not close the game</string>
+    <string name="schedule_close_game_effect_foreground">Current effect: run mode is foreground, so this option does nothing</string>
+    <string name="schedule_close_game_effect_global">Current effect: the global switch is on, so the game closes when the task ends</string>
+    <string name="schedule_close_game_effect_strategy">Current effect: this strategy closes the game after the task ends normally</string>
+    <string name="schedule_close_game_effect_inactive">Current effect: the game is not closed when the task ends</string>
     <string name="schedule_permission_tip_battery_optimization">Disable battery optimization</string>
     <string name="schedule_permission_tip_exact_alarm">Allow exact alarms</string>
     <string name="schedule_permission_title">Permission reminder</string>
@@ -1511,6 +1593,7 @@
     <string name="schedule_result_in_progress">In progress…</string>
     <string name="schedule_log_scheduled_time">Scheduled: %1$s</string>
     <string name="schedule_log_triggered_time">Triggered: %1$s</string>
+    <string name="schedule_log_run_mode">Run mode: %1$s</string>
     <string name="schedule_log_detail_title">Trigger details</string>
     <string name="schedule_log_result">Result: %1$s</string>
     <string name="schedule_day_full_monday">Monday</string>
@@ -1557,10 +1640,46 @@
     <string name="notification_channel_schedule_desc">Scheduled task execution and result notifications</string>
     <string name="notification_schedule_title">Scheduled Task</string>
     <string name="notification_schedule_preparing">Preparing to launch…</string>
-    <string name="notification_schedule_skipped">Scheduled Task Skipped</string>
-    <string name="notification_schedule_failed">Scheduled Task Failed</string>
     <string name="notification_schedule_device_locked">Device is locked</string>
+    <string name="notification_schedule_pin_required">Skipped: a device lock password is set. Configure a PIN in settings, or use "Tasks → Options → Screen Off" instead of the system lock screen</string>
     <string name="notification_schedule_detail">\"%1$s\": %2$s</string>
+
+    <!-- i18n: schedule trigger journal (pipeline) -->
+    <string name="schedule_log_received">Launch request received: %1$s</string>
+    <string name="schedule_log_skipped_busy">Another scheduled launch is already in progress</string>
+    <string name="schedule_log_task_running_busy">A task is already running</string>
+    <string name="schedule_log_force_stop_running">Force start: stopping the running task</string>
+    <string name="schedule_log_wake_start">Waking and unlocking…</string>
+    <string name="schedule_log_wake_ok">Wake and unlock succeeded</string>
+    <string name="schedule_log_auto_sleep_skipped_awake">Device was already unlocked at start, skipping sleep after task</string>
+    <string name="schedule_log_auto_sleep_skipped_screensaver">Screen saver still on; skipped sleep after task</string>
+    <string name="schedule_log_screen_saver_on">Screen saver enabled</string>
+    <string name="schedule_log_screen_saver_kept">Keeping the screen saver already on</string>
+    <string name="schedule_log_screen_saver_failed">Screen saver failed to start, the overlay permission may be missing</string>
+    <string name="schedule_log_wake_failed">Wake and unlock failed: %1$s</string>
+    <string name="schedule_log_wake_pin_required">Lock password set but PIN not configured; skipped</string>
+    <string name="schedule_log_wake_skipped_screensaver">Screen saver is keeping the screen on; skipped system lock</string>
+    <string name="schedule_log_keyguard_skipped">Keyguard check skipped</string>
+
+    <string name="schedule_log_wait_profile">Waiting for task profile…</string>
+    <string name="schedule_log_switch_profile">Switching profile: %1$s</string>
+    <string name="schedule_log_profile_missing">Linked task profile was deleted</string>
+    <string name="schedule_log_empty_chain">No enabled tasks in the linked profile</string>
+    <string name="schedule_log_launch_ui">Launching UI…</string>
+    <string name="schedule_log_ui_launch_failed">Failed to launch UI</string>
+    <string name="schedule_log_countdown_start">Countdown started (%1$d s)</string>
+    <string name="schedule_log_countdown_done">Countdown finished, starting</string>
+    <string name="schedule_log_start_now">User chose Start now</string>
+    <string name="schedule_log_user_cancelled">User cancelled the scheduled launch</string>
+    <string name="schedule_log_starting_tasks">Preconditions OK, %1$d task(s), starting…</string>
+    <string name="schedule_log_start_success">Task start succeeded</string>
+    <string name="schedule_log_start_failed">Task start failed: %1$s</string>
+    <string name="schedule_log_task_blocked">Task blocked: %1$s</string>
+    <string name="schedule_log_task_needs_confirmation">Confirmation required; automation rejected</string>
+    <string name="schedule_log_exception">Exception: %1$s</string>
+    <string name="schedule_log_cancelled_preempt">Launch cancelled or preempted</string>
+    <string name="schedule_log_external_name">External trigger</string>
+    <string name="schedule_log_strategy_missing">Strategy missing or not loaded</string>
 
     <!-- i18n: notification level -->
     <string name="notification_level_off">Off</string>
@@ -1635,6 +1754,10 @@
     <string name="announcement_dont_show_again_hint">Please read the full announcement and stay for %1$d seconds to enable</string>
     <string name="announcement_scroll_to_bottom_hint">Please read the full announcement first</string>
     <string name="announcement_confirm">Confirm</string>
+    <string name="announcement_section_all">All Announcements</string>
+    <string name="announcement_not_finished_confirm_1">You haven\'t finished reading. Please confirm after you finish.</string>
+    <string name="announcement_not_finished_confirm_2">Yes, you — still clicking</string>
+    <string name="announcement_not_finished_confirm_3">Still clicking</string>
 
     <!-- i18n: overlay floatball -->
     <string name="overlay_floatball_countdown_desc">Countdown, %1$s seconds remaining</string>
@@ -1922,58 +2045,60 @@
     <string name="achievement_SlackingOff_title">Slacking Off</string>
     <string name="achievement_SlackingOff_desc">Done with serious business, time to play something else.</string>
     <string name="achievement_SlackingOff_condition">Launch a mini-game once</string>
+    <string name="achievement_AnnouncementStubbornClick_title">Stubborn</string>
+    <string name="achievement_AnnouncementStubbornClick_desc">Even after being prompted so many times, you still choose not to read the announcement.</string>
+    <string name="achievement_AnnouncementStubbornClick_condition">Click the confirm button more than 20 times without scrolling to the bottom</string>
 
     <!-- runtime session log (shown in log panel / history) -->
     <string name="runlog_task_start">Starting tasks (%1$d total)</string>
     <string name="runlog_task_started">Tasks started</string>
     <!-- TODO: remove after MaaCore adapts proxy multipliers 7~10 -->
-    <string name="runlog_depot_plan_invalid_drop">Plan %1$d: no drop item specified.</string>
-    <string name="runlog_depot_plan_zero_count">Plan %1$d: target inventory is 0.</string>
-    <string name="runlog_depot_plan_no_stage">Plan %1$d: stage not specified or is \"Current/Last\".</string>
-    <string name="runlog_depot_plan_stage_not_open">Plan %1$d: stage \'%2$s\' is not open.</string>
-    <string name="runlog_depot_plan_inventory_enough">Plan %1$s: %2$s inventory sufficient (current %3$d / target %4$d).</string>
-    <string name="runlog_fight_inventory_unavailable">Task \"%1$s\" uses target inventory, but no inventory data is currently available, so it was skipped. Update it via \"Toolbox - Depot Recognition\".</string>
-    <string name="runlog_depot_set_params_failed">Plan %1$s: failed to update task params; original params will be used.</string>
-    <string name="runlog_depot_skipped_activity">An event is in progress; Depot Maintain skipped.</string>
-    <string name="runlog_depot_skipped_resource">The resource collection event is active; Depot Maintain skipped.</string>
+    <string name="runlog_log_section">-----%1$s-----</string>
+    <string name="runlog_depot_plan_invalid_drop">#%1$d: no drop item specified</string>
+    <string name="runlog_depot_plan_zero_count">#%1$d: target inventory is 0</string>
+    <string name="runlog_depot_plan_no_stage">#%1$d: stage not specified or is \"Current/Last\"</string>
+    <string name="runlog_depot_plan_stage_not_open">#%1$d: stage \'%2$s\' is not open</string>
+    <string name="runlog_depot_plan_inventory_enough">%1$s: %2$s sufficient %3$d/%4$d</string>
+    <string name="runlog_depot_plan_inventory_insufficient">%1$s: %2$s insufficient %3$d/%4$d, need %5$d more</string>
+    <string name="runlog_fight_inventory_unavailable">Task \"%1$s\" uses target inventory, but no inventory data is currently available, so it was skipped. Update it via \"Toolbox - Depot Recognition\"</string>
+    <string name="runlog_depot_set_params_failed">%1$s: failed to update task params; original params will be used</string>
+    <string name="runlog_depot_skipped_activity">An event is in progress; Depot Maintain skipped</string>
+    <string name="runlog_depot_skipped_resource">The resource collection event is active; Depot Maintain skipped</string>
     <string name="runlog_copilot_start">Starting auto-battle</string>
     <string name="runlog_copilot_started">Auto-battle started</string>
     <string name="runlog_service_connecting">Service is starting, please try again later</string>
     <string name="runlog_backend_unavailable">%1$s is unavailable; start canceled</string>
     <string name="runlog_resource_load_failed">Failed to load resources</string>
     <string name="runlog_portrait_orientation">Currently in portrait mode; foreground mode requires landscape</string>
+    <string name="runlog_invalid_aspect_ratio">Current resolution %1$dx%2$d is not 16:9; cannot run in foreground mode</string>
     <string name="runlog_create_instance_failed">Failed to create MaaCore instance</string>
     <string name="runlog_set_touch_mode_failed">Failed to set touch mode</string>
     <string name="runlog_maa_connect_failed">MaaCore connection timed out or failed</string>
     <string name="runlog_display_mode_failed">Failed to set display mode</string>
     <string name="runlog_virtual_display_failed">Failed to start virtual display</string>
+    <string name="runlog_virtual_display_failed_shizuku_as_root">Failed to start virtual display: Shizuku is running as root (uid 0). Please switch to the built-in Root mode instead of starting Shizuku with root</string>
     <string name="runlog_maa_start_failed">Failed to start MaaCore</string>
     <string name="runlog_remote_connect_failed">Cannot connect to remote service: %1$s</string>
     <string name="runlog_task_stopping">Stopping tasks...</string>
     <string name="runlog_task_stopped">Tasks stopped, status: %1$s</string>
     <string name="runlog_service_terminated">MAA service terminated unexpectedly</string>
     <string name="runlog_game_process_gone">Game process not started or closed unexpectedly (%1$s)</string>
-    <string name="runlog_game_left_virtual_display">Game window left the virtual display and could not be moved back (%1$s). Try enabling \"Force FULLSCREEN mode\" or switch to foreground mode</string>
+    <string name="runlog_game_left_virtual_display">Game window left the virtual display and could not be moved back (%1$s). Try enabling \"Force fullscreen in background mode\" or switch to foreground mode</string>
 
-    <!-- Wake + unlock -->
-    <string name="settings_wake_unlock_section">Wake &amp; unlock</string>
-    <string name="settings_wake_unlock_section_desc">Turn the screen on and dismiss the lock screen before a scheduled task runs. The lock screen covers the virtual display, blocking both foreground and background modes</string>
-    <string name="settings_wake_unlock_type">Unlock method</string>
-    <string name="settings_wake_unlock_type_none">Do not unlock</string>
-    <string name="settings_wake_unlock_type_swipe">No password / swipe</string>
-    <string name="settings_wake_unlock_type_pin">PIN</string>
+    <!-- Scheduled lock · PIN -->
     <string name="settings_wake_credential">PIN</string>
-    <string name="settings_wake_credential_hint">Enter the lock screen PIN (digits only)</string>
+    <string name="settings_wake_credential_hint">4–16 digits</string>
     <string name="settings_wake_credential_show">Show PIN</string>
     <string name="settings_wake_credential_hide">Hide PIN</string>
-    <string name="settings_wake_credential_warning">The PIN is stored in plain text on this device. It is stripped from exported config, but can still leak if someone gets hold of the device. Pattern locks are not supported — use a PIN or no password.</string>
-    <string name="settings_wake_test_button">Test now</string>
-    <string name="settings_wake_test_hint">Checks that the screen turns on and the lock screen is dismissed. To test the full flow, lock the screen and let a scheduled task fire</string>
+    <string name="settings_wake_credential_warning">Pattern and alphanumeric passwords are not supported</string>
+    <string name="settings_wake_test_button">Test</string>
+    <string name="settings_wake_test_hint">Lock first, then auto-unlock after ~0.5s</string>
     <string name="wake_result_ok">Wake + unlock succeeded</string>
     <string name="wake_result_wake_failed">Screen would not turn on</string>
     <string name="wake_result_credential_required">A PIN is required for this lock screen</string>
-    <string name="wake_result_credential_rejected">Unlock failed, the PIN may be wrong. Stopped retrying to avoid triggering a system lockout</string>
-    <string name="wake_result_bouncer_not_ready">The lock screen credential prompt did not appear</string>
+    <string name="wake_result_credential_rejected">Unlock failed; stopped retrying to avoid a lockout. Check that the PIN is correct; when fingerprint unlock is enabled the system may intercept PIN entry and prevent automatic unlocking</string>
+    <string name="wake_result_no_keyguard">No lock screen set; unlocking is not needed</string>
     <string name="wake_result_unsupported">Not supported on this system</string>
+    <string name="wake_result_lock_failed">Could not enter lock screen</string>
     <string name="wake_result_ipc_failed">Elevated service not connected</string>
 </resources>

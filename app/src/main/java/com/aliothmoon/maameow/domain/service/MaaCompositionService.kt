@@ -29,6 +29,7 @@ import com.aliothmoon.maameow.maa.task.MaaTaskParams
 import com.aliothmoon.maameow.manager.RemoteAccessCoordinator
 import com.aliothmoon.maameow.manager.RemoteServiceManager
 import com.aliothmoon.maameow.manager.RemoteServiceManager.useRemoteService
+import com.aliothmoon.maameow.manager.ShizukuManager
 import com.aliothmoon.maameow.remote.PermissionGrantRequest
 import com.aliothmoon.maameow.utils.Misc
 import com.aliothmoon.maameow.utils.i18n.UiText
@@ -89,14 +90,12 @@ class MaaCompositionService(
 
     private fun setRunState(state: MaaExecutionState) {
         _state.value = state
-        when (state) {
-            MaaExecutionState.STARTING ->
-                TaskExecutionService.start(context)
-
-            MaaExecutionState.IDLE, MaaExecutionState.ERROR ->
-                TaskExecutionService.stop(context)
-
-            MaaExecutionState.STOPPING, MaaExecutionState.RUNNING -> {}
+        // 仅在 STARTING 拉起前台服务；终态不做外部 stopService —
+        // 快速失败时 stopService 可能抢在服务创建之前到达，系统会因
+        // startForeground 契约未履行直接杀进程（RemoteServiceException）。
+        // 服务自身观察状态流，startForeground 后对 IDLE/ERROR 自行 stopSelf
+        if (state == MaaExecutionState.STARTING) {
+            TaskExecutionService.start(context)
         }
     }
 
@@ -124,9 +123,10 @@ class MaaCompositionService(
             }
         }
 
-        /** 显示/连接层失败（虚拟屏幕、连接） */
+        /** 显示/连接层失败（虚拟屏幕、连接）；[shizukuAsRoot] 标记 Shizuku 后端却以 root 运行 */
         data class ConnectionError(
             val phase: ConnectPhase,
+            val shizukuAsRoot: Boolean = false,
         ) : StartResult() {
             enum class ConnectPhase {
                 DISPLAY_MODE,
@@ -140,6 +140,9 @@ class MaaCompositionService(
 
         /** 前台模式下检测到竖屏（高 > 宽），需要横屏才能运行 */
         data object PortraitOrientationError : StartResult()
+
+        /** 前台模式下物理分辨率不是 16:9，MAA 识别要求 16:9 */
+        data object InvalidAspectRatioError : StartResult()
 
         /** 远程服务正在连接中，任务无法立即启动 */
         data object ServiceConnecting : StartResult()
@@ -213,13 +216,11 @@ class MaaCompositionService(
     suspend fun start(
         tasks: List<MaaTaskParams>,
         clientType: String,
-        isScheduled: Boolean = false,
         preflightLogs: List<Pair<UiText, LogLevel>> = emptyList(),
         onSessionStarted: (suspend () -> Unit)? = null
     ): StartResult = executeStart(
         tasks = tasks,
         clientType = clientType,
-        isScheduled = isScheduled,
         startMessage = context.getString(R.string.runlog_task_start, tasks.size),
         successMessage = context.getString(R.string.runlog_task_started),
         preflightLogs = preflightLogs,
@@ -255,10 +256,7 @@ class MaaCompositionService(
         return result
     }
 
-    private suspend fun checkPreconditions(
-        mode: RunMode,
-        isScheduled: Boolean = false
-    ): StartResult? {
+    private suspend fun checkPreconditions(mode: RunMode): StartResult? {
         // 服务连接中时直接拒绝，避免与后台自动 load() 并发触发 LoadResource
         val serviceState = RemoteServiceManager.state.value
         if (serviceState is RemoteServiceManager.ServiceState.Connecting) {
@@ -287,12 +285,20 @@ class MaaCompositionService(
                 StartResult.ResourceError(loaded.exceptionOrNull())
             )
         }
-        if (mode == RunMode.FOREGROUND && !isScheduled) {
+        // 前台（含定时 / LAUNCH_PROFILE）必须横屏且 16:9；后台走虚拟屏自带 16:9
+        if (mode == RunMode.FOREGROUND) {
             val (width, height) = Misc.getScreenSize(context)
             if (height > width) {
                 return failStart(
                     context.getString(R.string.runlog_portrait_orientation), "PORTRAIT",
                     StartResult.PortraitOrientationError
+                )
+            }
+            if (!Misc.isAspectRatio16x9(width, height)) {
+                return failStart(
+                    context.getString(R.string.runlog_invalid_aspect_ratio, width, height),
+                    "INVALID_ASPECT_RATIO",
+                    StartResult.InvalidAspectRatioError
                 )
             }
         }
@@ -342,12 +348,7 @@ class MaaCompositionService(
         val config = when (mode) {
             RunMode.FOREGROUND -> {
                 val displayId = service.startVirtualDisplay()
-                if (displayId == -1)
-                    return failStart(
-                        context.getString(R.string.runlog_virtual_display_failed),
-                        "VIRTUAL_DISPLAY_ERROR",
-                        StartResult.ConnectionError(StartResult.ConnectionError.ConnectPhase.VIRTUAL_DISPLAY)
-                    )
+                if (displayId == -1) return failVirtualDisplayStart()
                 val (w, h) = Misc.getScreenSize(context)
                 buildConnectConfig(w, h, displayId)
             }
@@ -355,12 +356,7 @@ class MaaCompositionService(
             RunMode.BACKGROUND -> {
                 val r = resolveAndSetResolution(service, clientType)
                 val displayId = service.startVirtualDisplay()
-                if (displayId == -1)
-                    return failStart(
-                        context.getString(R.string.runlog_virtual_display_failed),
-                        "VIRTUAL_DISPLAY_ERROR",
-                        StartResult.ConnectionError(StartResult.ConnectionError.ConnectPhase.VIRTUAL_DISPLAY)
-                    )
+                if (displayId == -1) return failVirtualDisplayStart()
                 buildConnectConfig(r.width, r.height, displayId)
             }
         }
@@ -372,6 +368,26 @@ class MaaCompositionService(
         val pauseEnabled = appSettings.deploymentWithPause.value
         maa.SetInstanceOption(DEPLOYMENT_WITH_PAUSE, if (pauseEnabled) "1" else "0")
         return asyncConnect(maa, config)
+    }
+
+    /** 虚拟显示启动失败；若是 Root 授权的 Shizuku（uid 0）则附加改用内置 Root 模式的提示 */
+    private suspend fun failVirtualDisplayStart(): StartResult {
+        val shizukuAsRoot =
+            RemoteServiceManager.connectedBackendOrNull() == RemoteBackend.SHIZUKU &&
+                    ShizukuManager.isRunningAsRoot()
+        val message = if (shizukuAsRoot) {
+            context.getString(R.string.runlog_virtual_display_failed_shizuku_as_root)
+        } else {
+            context.getString(R.string.runlog_virtual_display_failed)
+        }
+        return failStart(
+            message,
+            "VIRTUAL_DISPLAY_ERROR",
+            StartResult.ConnectionError(
+                StartResult.ConnectionError.ConnectPhase.VIRTUAL_DISPLAY,
+                shizukuAsRoot = shizukuAsRoot,
+            )
+        )
     }
 
     private fun grantGameBatteryExemption(clientType: String) {
@@ -425,11 +441,13 @@ class MaaCompositionService(
         clientType: String,
         startMessage: String,
         successMessage: String,
-        isScheduled: Boolean = false,
         preflightLogs: List<Pair<UiText, LogLevel>> = emptyList(),
         onSessionStarted: (suspend () -> Unit)? = null,
     ): StartResult {
-        setRunState(MaaExecutionState.STARTING)
+        // 会话与日志先开；STARTING/FGS 必须在前置检查通过后再进入。
+        // 否则竖屏等快速失败会 stop 尚未 startForeground 的 FGS，触发
+        // ForegroundServiceDidNotStartInTimeException。
+        val mode = appSettings.runMode.value
         sessionLogger.startSession(tasks.map { it.type.value })
         subTaskHandler.resetSessionState()
         toolboxResultCollector.onSessionStart()
@@ -440,9 +458,10 @@ class MaaCompositionService(
         }
         sessionLogger.appendAndWait(fetchDeviceMemoryInfo(), LogLevel.INFO)
 
-        val mode = appSettings.runMode.value
         return withContext(Dispatchers.IO) {
-            checkPreconditions(mode, isScheduled)?.let { return@withContext it }
+            checkPreconditions(mode)?.let { return@withContext it }
+
+            setRunState(MaaExecutionState.STARTING)
 
             try {
                 useRemoteService { service ->

@@ -14,6 +14,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -27,7 +30,7 @@ import com.aliothmoon.maameow.overlay.screensaver.ScreenSaverOverlayManager
 import com.aliothmoon.maameow.presentation.ProvideInputFocusManager
 import com.aliothmoon.maameow.presentation.navigation.AppNavigation
 import com.aliothmoon.maameow.presentation.viewmodel.BackgroundTaskViewModel
-import com.aliothmoon.maameow.schedule.model.ScheduledExecutionRequest
+import com.aliothmoon.maameow.schedule.LaunchIntentMapper
 import com.aliothmoon.maameow.theme.MaaMeowTheme
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
@@ -39,6 +42,9 @@ class MainActivity : AppCompatActivity() {
 
     @Volatile
     private var isUiReady: Boolean = false
+
+    /** 系统栏是否由屏保收起 */
+    private var systemBarsHiddenBySaver: Boolean = false
 
     private val appSettingsManager: AppSettingsManager by inject()
     private val achievementRepository: AchievementRepository by inject()
@@ -59,6 +65,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         doObserveKeepScreenOn()
+        doObserveScreenSaverBars()
         doObserveThemeMode()
         window.decorView.viewTreeObserver.addOnPreDrawListener(object :
             ViewTreeObserver.OnPreDrawListener {
@@ -103,9 +110,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun dispatchScheduledLaunchIntent(intent: Intent?) {
-        val request = ScheduledExecutionRequest.fromIntent(intent)
-            ?: ScheduledExecutionRequest.fromExternalIntent(intent)
-        request?.let { backgroundTaskViewModel.onScheduledLaunch(it) }
+        // SHOW：仅拉起 UI，禁止二次 execute（Service 已拥有 Schedule 管线）
+        if (LaunchIntentMapper.isShowScheduleIntent(intent)) {
+            return
+        }
+        LaunchIntentMapper.fromExternalIntent(this, intent)?.let { request ->
+            backgroundTaskViewModel.onExternalLaunch(request)
+        }
     }
 
     private fun doObserveKeepScreenOn() {
@@ -127,6 +138,26 @@ class MainActivity : AppCompatActivity() {
                         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     } else {
                         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
+                }
+            }
+        }
+    }
+
+    /** 屏保时收系统栏；标记挂 Activity 上以便 STOPPED 后仍能恢复 */
+    private fun doObserveScreenSaverBars() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                val controller = WindowCompat.getInsetsController(window, window.decorView)
+                screenSaverManager.showing.collect { showing ->
+                    if (showing) {
+                        controller.hide(WindowInsetsCompat.Type.systemBars())
+                        controller.systemBarsBehavior =
+                            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                        systemBarsHiddenBySaver = true
+                    } else if (systemBarsHiddenBySaver) {
+                        controller.show(WindowInsetsCompat.Type.systemBars())
+                        systemBarsHiddenBySaver = false
                     }
                 }
             }

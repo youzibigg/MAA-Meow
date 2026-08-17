@@ -1,7 +1,7 @@
 package com.aliothmoon.maameow.presentation.view.panel
 
 import android.content.Context
-import androidx.compose.animation.AnimatedVisibility
+import com.aliothmoon.maameow.theme.MaaAnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
@@ -147,7 +147,7 @@ fun InfrastConfigPanel(
                         }
                         item {
                             // 自定义基建配置 (仅 Custom 模式显示)
-                            AnimatedVisibility(
+                            MaaAnimatedVisibility(
                                 visible = config.mode == InfrastMode.Custom,
                                 enter = expandVertically(),
                                 exit = shrinkVertically()
@@ -157,7 +157,7 @@ fun InfrastConfigPanel(
                         }
                         item {
                             // 无人机用途 (Custom 模式下禁用)
-                            AnimatedVisibility(
+                            MaaAnimatedVisibility(
                                 visible = config.mode != InfrastMode.Custom,
                                 enter = expandVertically(),
                                 exit = shrinkVertically()
@@ -167,7 +167,7 @@ fun InfrastConfigPanel(
                         }
                         item {
                             // 心情阈值 (仅 Normal 模式显示)
-                            AnimatedVisibility(
+                            MaaAnimatedVisibility(
                                 visible = config.mode != InfrastMode.Rotation,
                                 enter = expandVertically(),
                                 exit = shrinkVertically()
@@ -185,7 +185,7 @@ fun InfrastConfigPanel(
                     else -> {
                         item {
                             // 宿舍信赖模式 (仅 Normal 模式显示)
-                            AnimatedVisibility(
+                            MaaAnimatedVisibility(
                                 visible = config.mode != InfrastMode.Rotation,
                                 enter = expandVertically(),
                                 exit = shrinkVertically()
@@ -195,7 +195,7 @@ fun InfrastConfigPanel(
                         }
                         item {
                             // 不将已进驻干员放入宿舍 (仅 Normal 模式显示)
-                            AnimatedVisibility(
+                            MaaAnimatedVisibility(
                                 visible = config.mode != InfrastMode.Rotation,
                                 enter = expandVertically(),
                                 exit = shrinkVertically()
@@ -267,7 +267,7 @@ private fun InfrastModeSection(
         }
 
         // Rotation 模式提示文字
-        AnimatedVisibility(
+        MaaAnimatedVisibility(
             visible = config.mode == InfrastMode.Rotation,
             enter = expandVertically(),
             exit = shrinkVertically()
@@ -418,7 +418,7 @@ private fun CustomInfrastSection(
                                 }
                             }
                         }
-                        AnimatedVisibility(
+                        MaaAnimatedVisibility(
                             visible = descExpanded && !custom.description.isNullOrBlank(),
                             enter = expandVertically(),
                             exit = shrinkVertically()
@@ -509,7 +509,7 @@ private fun PresetButtonGroup(
             fontWeight = FontWeight.Medium
         )
 
-        UiUsageConstants.defaultInfrastPresets.forEach { (key, _) ->
+        UiUsageConstants.defaultInfrastPresets.forEach { key ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.clickable { onPresetSelected(key) }) {
@@ -829,17 +829,20 @@ private fun FacilitiesSection(
             facilities = config.facilities,
             onFacilitiesChange = { onConfigChange(config.copy(facilities = it)) })
 
-        // 全选/清除按钮
         Row(
-            modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Button(
                 onClick = {
                     onConfigChange(
                         config.copy(
-                            facilities = config.facilities.map { it.first to true })
+                            facilities = config.facilities.map { it.first to true },
+                        ),
                     )
-                }, modifier = Modifier.weight(1f)
+                },
+                modifier = Modifier.weight(1f),
+                shape = MaterialTheme.shapes.small,
             ) {
                 Text(stringResource(R.string.common_select_all))
             }
@@ -848,9 +851,12 @@ private fun FacilitiesSection(
                 onClick = {
                     onConfigChange(
                         config.copy(
-                            facilities = config.facilities.map { it.first to false })
+                            facilities = config.facilities.map { it.first to false },
+                        ),
                     )
-                }, modifier = Modifier.weight(1f)
+                },
+                modifier = Modifier.weight(1f),
+                shape = MaterialTheme.shapes.small,
             ) {
                 Text(stringResource(R.string.common_clear))
             }

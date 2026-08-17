@@ -4,7 +4,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
-import androidx.compose.animation.AnimatedVisibility
+import com.aliothmoon.maameow.theme.MaaAnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -404,7 +404,7 @@ fun AutoBattlePanel(
                 val hasDetail =
                     doc.title.isNotBlank() || doc.details.isNotBlank() || state.operatorSummary?.isEmpty == false
                 val hasVideo = state.videoUrl.isNotBlank()
-                if (hasDetail || hasVideo) {
+                if (hasDetail || hasVideo || state.requirementWarnings.isNotEmpty()) {
                     item {
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
@@ -436,6 +436,22 @@ fun AutoBattlePanel(
                                         }
                                     }
                                 }
+                                // 干员需求自动校正提示，跟着作业详情一起展示
+                                if (state.requirementWarnings.isNotEmpty()) {
+                                    HorizontalDivider(
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f)
+                                    )
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        state.requirementWarnings.forEach { warning ->
+                                            Text(
+                                                text = warning.asString(),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.error,
+                                            )
+                                        }
+                                    }
+                                }
+
                                 val summary = state.operatorSummary
                                 if (summary != null && !summary.isEmpty) {
                                     if (doc.title.isNotBlank() || doc.details.isNotBlank()) {
@@ -966,7 +982,7 @@ private fun BuiltinCopilotTree(
     onSelectFile: (CopilotResourceProvider.Node) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    AnimatedVisibility(
+    MaaAnimatedVisibility(
         visible = expanded,
         enter = expandVertically() + fadeIn(),
         exit = shrinkVertically() + fadeOut(),

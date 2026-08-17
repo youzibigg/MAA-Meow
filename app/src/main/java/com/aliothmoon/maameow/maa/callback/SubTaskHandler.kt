@@ -3,6 +3,7 @@
 import android.content.Context
 import com.alibaba.fastjson2.JSONArray
 import com.alibaba.fastjson2.JSONObject
+import com.aliothmoon.maameow.R
 import com.aliothmoon.maameow.data.achievement.AchievementEvents
 import com.aliothmoon.maameow.data.achievement.AchievementRepository
 import com.aliothmoon.maameow.data.model.FightConfig
@@ -442,6 +443,10 @@ class SubTaskHandler(
         val what = details.getString("what") ?: return
 
         when (what) {
+            "PixelPaintProgress" -> logPixelPaintProgress(
+                toolboxResultCollector.onPixelPaintProgress(subDetails)
+            )
+
             "FightTimes" -> {
                 pendingFight = pendingFight.copy(
                     timesFinished = subDetails?.getIntValue("times_finished"),
@@ -880,6 +885,22 @@ class SubTaskHandler(
         }
 
         return combos.takeIf { it.isNotEmpty() }
+    }
+
+    /**
+     * 像素画进度写运行日志
+     * Core 每满 10 格报一次、每色收尾再报一次，最后一色画满即为完成
+     */
+    private fun logPixelPaintProgress(progress: PixelPaintProgress?) {
+        progress ?: return
+        if (progress.total > 0 && progress.done >= progress.total) {
+            append(resources.getString(R.string.pixel_art_log_done), LogLevel.SUCCESS)
+        } else {
+            append(
+                resources.getString(R.string.pixel_art_progress, progress.done, progress.total),
+                LogLevel.TRACE,
+            )
+        }
     }
 
     // ==================== 字符串资源辅助方法 ====================

@@ -1,16 +1,14 @@
 package com.aliothmoon.maameow.schedule.ui
 
-import android.app.AlarmManager
 import android.content.Context
-import android.os.Build
 import android.os.PowerManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aliothmoon.maameow.R
 import com.aliothmoon.maameow.data.model.TaskProfile
 import com.aliothmoon.maameow.data.preferences.AppSettingsManager
-import com.aliothmoon.maameow.domain.models.RemoteBackend
 import com.aliothmoon.maameow.data.preferences.TaskChainState
+import com.aliothmoon.maameow.domain.models.RunMode
 import com.aliothmoon.maameow.schedule.data.ScheduleStrategyRepository
 import com.aliothmoon.maameow.schedule.model.ScheduleStrategy
 import com.aliothmoon.maameow.schedule.model.ScheduleType
@@ -18,10 +16,13 @@ import com.aliothmoon.maameow.schedule.service.ScheduleAlarmManager
 import com.aliothmoon.maameow.utils.i18n.UiText
 import com.aliothmoon.maameow.utils.i18n.uiTextOf
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
@@ -44,11 +45,10 @@ data class ScheduleEditUiState(
     val profiles: List<TaskProfile> = emptyList(),
     val selectedProfileId: String? = null,
     val forceStart: Boolean = false,
-    // 唤醒+解锁
-    val wakeUnlockEnabled: Boolean = false,
+    val autoScreenSaver: Boolean = false,
     val autoSleepAfterTask: Boolean = false,
-    /** 设置页是否已配置解锁方式+密码 */
-    val wakeUnlockConfigured: Boolean = false,
+    val skipAutoSleepIfAwake: Boolean = false,
+    val closeGameAfterTask: Boolean = false,
     val isSaving: Boolean = false,
     val saveSuccess: Boolean = false,
     val needBatteryOptimization: Boolean = false,
@@ -56,15 +56,37 @@ data class ScheduleEditUiState(
     val errorMessage: UiText? = null
 )
 
+/** 「任务结束后关闭游戏」当前实际会不会生效 */
+enum class CloseGameEffect {
+    ForegroundInactive,
+    GlobalOverride,
+    StrategyActive,
+    Inactive,
+}
+
 class ScheduleEditViewModel(
     private val repository: ScheduleStrategyRepository,
     private val taskChainState: TaskChainState,
     private val scheduleAlarmManager: ScheduleAlarmManager,
-    private val appSettingsManager: AppSettingsManager,
+    appSettings: AppSettingsManager,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ScheduleEditUiState())
     val state: StateFlow<ScheduleEditUiState> = _state.asStateFlow()
+
+    /** 与 LaunchPipeline 的判定同源，改一处必须改另一处 */
+    val closeGameEffect: StateFlow<CloseGameEffect> = combine(
+        _state,
+        appSettings.runMode,
+        appSettings.closeAppOnTaskEnd,
+    ) { state, runMode, globalOn ->
+        when {
+            runMode != RunMode.BACKGROUND -> CloseGameEffect.ForegroundInactive
+            globalOn -> CloseGameEffect.GlobalOverride
+            state.closeGameAfterTask -> CloseGameEffect.StrategyActive
+            else -> CloseGameEffect.Inactive
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CloseGameEffect.Inactive)
 
     private var strategyId: String? = null
     private var existingStrategy: ScheduleStrategy? = null
@@ -97,9 +119,10 @@ class ScheduleEditViewModel(
                         profiles = profiles,
                         selectedProfileId = strategy.profileId,
                         forceStart = strategy.forceStart,
-                        wakeUnlockEnabled = strategy.wakeUnlockEnabled,
+                        autoScreenSaver = strategy.autoScreenSaver,
                         autoSleepAfterTask = strategy.autoSleepAfterTask,
-                        wakeUnlockConfigured = isWakeUnlockConfigured(),
+                        skipAutoSleepIfAwake = strategy.skipAutoSleepIfAwake,
+                        closeGameAfterTask = strategy.closeGameAfterTask,
                     )
                     return@launch
                 }
@@ -114,7 +137,6 @@ class ScheduleEditViewModel(
                 name = defaultName,
                 profiles = profiles,
                 selectedProfileId = taskChainState.profileId.value.ifEmpty { profiles.firstOrNull()?.id },
-                wakeUnlockConfigured = isWakeUnlockConfigured(),
             )
         }
     }
@@ -181,22 +203,20 @@ class ScheduleEditViewModel(
         _state.update { it.copy(forceStart = value) }
     }
 
-    fun onWakeUnlockEnabledChanged(value: Boolean) {
-        _state.update { it.copy(wakeUnlockEnabled = value) }
+    fun onAutoScreenSaverChanged(value: Boolean) {
+        _state.update { it.copy(autoScreenSaver = value) }
     }
 
     fun onAutoSleepAfterTaskChanged(value: Boolean) {
         _state.update { it.copy(autoSleepAfterTask = value) }
     }
 
-    /** 唤醒解锁能否启用：默认值 "swipe" 会让任何配置都判定成已就绪，所以要连后端一起看。 */
-    private fun isWakeUnlockConfigured(): Boolean {
-        if (appSettingsManager.startupBackend.value != RemoteBackend.ROOT) return false
-        return when (appSettingsManager.wakeUnlockType.value) {
-            "pin" -> appSettingsManager.wakeCredential.value.isNotBlank()
-            "swipe" -> true
-            else -> false
-        }
+    fun onSkipAutoSleepIfAwakeChanged(value: Boolean) {
+        _state.update { it.copy(skipAutoSleepIfAwake = value) }
+    }
+
+    fun onCloseGameAfterTaskChanged(value: Boolean) {
+        _state.update { it.copy(closeGameAfterTask = value) }
     }
 
     fun onReplaceTime(old: LocalTime, new: LocalTime) {
@@ -259,8 +279,10 @@ class ScheduleEditViewModel(
                     intervalMinutes = intervalMinutes,
                     profileId = current.selectedProfileId,
                     forceStart = current.forceStart,
-                    wakeUnlockEnabled = current.wakeUnlockEnabled,
+                    autoScreenSaver = current.autoScreenSaver,
                     autoSleepAfterTask = current.autoSleepAfterTask,
+                    skipAutoSleepIfAwake = current.skipAutoSleepIfAwake,
+                    closeGameAfterTask = current.closeGameAfterTask,
                 ) ?: ScheduleStrategy(
                     id = strategyId ?: UUID.randomUUID().toString(),
                     name = current.name.trim(),
@@ -272,8 +294,10 @@ class ScheduleEditViewModel(
                     intervalMinutes = intervalMinutes,
                     profileId = current.selectedProfileId,
                     forceStart = current.forceStart,
-                    wakeUnlockEnabled = current.wakeUnlockEnabled,
+                    autoScreenSaver = current.autoScreenSaver,
                     autoSleepAfterTask = current.autoSleepAfterTask,
+                    skipAutoSleepIfAwake = current.skipAutoSleepIfAwake,
+                    closeGameAfterTask = current.closeGameAfterTask,
                 )
 
                 if (current.isNew) {
@@ -288,9 +312,7 @@ class ScheduleEditViewModel(
                 // 检查关键权限
                 val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
                 val batteryOk = pm.isIgnoringBatteryOptimizations(context.packageName)
-                val alarmOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    (context.getSystemService(Context.ALARM_SERVICE) as AlarmManager).canScheduleExactAlarms()
-                } else true
+                val alarmOk = scheduleAlarmManager.canScheduleExact()
 
                 _state.update {
                     it.copy(

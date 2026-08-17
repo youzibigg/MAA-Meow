@@ -27,7 +27,8 @@ import com.aliothmoon.maameow.presentation.view.home.HomeView
 import com.aliothmoon.maameow.presentation.view.settings.SettingsView
 import com.aliothmoon.maameow.presentation.viewmodel.BackgroundTaskViewModel
 import com.aliothmoon.maameow.schedule.ui.ScheduleListView
-import com.aliothmoon.maameow.theme.MaaAnimations
+import com.aliothmoon.maameow.theme.LocalReduceMotion
+import com.aliothmoon.maameow.theme.MaaMotion
 import com.aliothmoon.maameow.theme.MaaBackgroundHost
 import com.aliothmoon.maameow.theme.MaxBackgroundBlur
 import com.aliothmoon.maameow.theme.ProvideColorScheme
@@ -48,6 +49,7 @@ fun MainScreen(
 ) {
     val pagerState = rememberPagerState(pageCount = { BottomNavTab.all.size })
     val scope = rememberCoroutineScope()
+    val reduceMotion = LocalReduceMotion.current
 
     // targetPage：点击/滑动一旦确定目标即生效，停稳后等于 currentPage。
     // animateScrollToPage 内部走 MutatorMutex，连续调用时后者自动接管，无需手动取消。
@@ -58,8 +60,8 @@ fun MainScreen(
             pagerState.animateScrollToPage(
                 page = index,
                 animationSpec = tween(
-                    durationMillis = 100 * distance + 100,
-                    easing = MaaAnimations.springEasing,
+                    durationMillis = MaaMotion.pagerDuration(distance, reduceMotion),
+                    easing = MaaMotion.Emphasized,
                 ),
             )
         }
@@ -72,11 +74,12 @@ fun MainScreen(
 
     // 定时任务触发时：若正处于子页面，先弹回主 Tab 浮出主界面，再滑到后台任务页
     // （恢复旧导航 navigate(BACKGROUND){popUpTo(HOME)} 的“自动浮出后台页”语义）。
-    val pendingScheduledExecution by backgroundTaskViewModel.coordinator.pendingExecution.collectAsStateWithLifecycle()
-    LaunchedEffect(pendingScheduledExecution?.requestId) {
-        if (pendingScheduledExecution != null) {
+    val pendingNavigateRequestId by backgroundTaskViewModel.pendingNavigateRequestId.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingNavigateRequestId) {
+        if (pendingNavigateRequestId != null) {
             navController.popBackStack(Routes.HOME, false)
             goToPage(BottomNavTab.all.indexOf(BottomNavTab.BACKGROUND))
+            backgroundTaskViewModel.onNavigateForScheduledLaunch()
         }
     }
 

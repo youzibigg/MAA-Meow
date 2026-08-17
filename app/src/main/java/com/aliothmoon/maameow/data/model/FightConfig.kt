@@ -3,6 +3,7 @@ package com.aliothmoon.maameow.data.model
 import com.aliothmoon.maameow.R
 import com.aliothmoon.maameow.data.resource.ActivityManager
 import com.aliothmoon.maameow.domain.models.DropTarget
+import com.aliothmoon.maameow.domain.models.putReportFields
 import com.aliothmoon.maameow.maa.task.MaaTaskParams
 import com.aliothmoon.maameow.maa.task.MaaTaskType
 import com.aliothmoon.maameow.maa.task.TaskSlot
@@ -353,20 +354,33 @@ data class FightConfig(
         } else {
             null
         }
-        if (need != null && need <= 0) {
+        if (need != null) {
             val dropName = ctx.itemHelper.getItemInfo(dropsItemId)?.name ?: dropsItemId
             val current = dropsQuantity - need
+            if (need <= 0) {
+                ctx.appendLog(
+                    uiTextOf(
+                        R.string.runlog_depot_plan_inventory_enough,
+                        ctx.node.name,
+                        dropName,
+                        current,
+                        dropsQuantity,
+                    ),
+                    LogLevel.TRACE,
+                )
+                return emptyList()
+            }
             ctx.appendLog(
                 uiTextOf(
-                    R.string.runlog_depot_plan_inventory_enough,
+                    R.string.runlog_depot_plan_inventory_insufficient,
                     ctx.node.name,
                     dropName,
                     current,
                     dropsQuantity,
+                    need,
                 ),
                 LogLevel.TRACE,
             )
-            return emptyList()
         }
 
         val paramsJson = buildJsonObject {
@@ -385,6 +399,7 @@ data class FightConfig(
                     put(dropsItemId, dropQty)
                 })
             }
+            putReportFields(ctx.report)
         }
 
         if (isSpecifiedDrops && isInventoryTarget && dropsItemId.isNotBlank()) {
@@ -400,6 +415,7 @@ data class FightConfig(
                     logLabel = ctx.node.name,
                     medicineExpireDays = expireDays,
                     drGrandet = isDrGrandet,
+                    report = ctx.report,
                 ),
             )
         }

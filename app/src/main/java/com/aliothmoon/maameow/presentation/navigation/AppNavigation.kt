@@ -25,9 +25,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.aliothmoon.maameow.announcement.AnnouncementConfig
+import com.aliothmoon.maameow.announcement.AnnouncementContent
+import com.aliothmoon.maameow.announcement.AnnouncementManager
 import com.aliothmoon.maameow.constant.Routes
 import com.aliothmoon.maameow.data.preferences.AppSettingsManager
+import com.aliothmoon.maameow.domain.launch.LaunchEffect
 import com.aliothmoon.maameow.domain.models.RunMode
+import com.aliothmoon.maameow.domain.service.AchievementReporter
 import com.aliothmoon.maameow.domain.service.ExternalNotificationService
 import com.aliothmoon.maameow.overlay.OverlayController
 import com.aliothmoon.maameow.presentation.LocalToaster
@@ -41,14 +45,14 @@ import com.aliothmoon.maameow.presentation.view.settings.AchievementView
 import com.aliothmoon.maameow.presentation.view.settings.ErrorLogView
 import com.aliothmoon.maameow.presentation.view.settings.LogHistoryView
 import com.aliothmoon.maameow.presentation.view.settings.TaskOverrideEditorView
-import com.aliothmoon.maameow.presentation.view.settings.WakeScheduleEditorView
 import com.aliothmoon.maameow.presentation.viewmodel.AppEventsViewModel
 import com.aliothmoon.maameow.presentation.viewmodel.BackgroundTaskViewModel
 import com.aliothmoon.maameow.schedule.model.CountdownState
 import com.aliothmoon.maameow.schedule.ui.CountdownDialog
 import com.aliothmoon.maameow.schedule.ui.ScheduleEditView
 import com.aliothmoon.maameow.schedule.ui.ScheduleTriggerLogView
-import com.aliothmoon.maameow.theme.MaaAnimations
+import com.aliothmoon.maameow.theme.LocalReduceMotion
+import com.aliothmoon.maameow.theme.MaaMotion
 import com.aliothmoon.maameow.utils.i18n.resolve
 import com.dokar.sonner.ToastType
 import com.dokar.sonner.Toaster
@@ -68,6 +72,8 @@ fun AppNavigation(
     appSettings: AppSettingsManager = koinInject(),
     notificationService: ExternalNotificationService = koinInject(),
     overlayController: OverlayController = koinInject(),
+    announcementManager: AnnouncementManager = koinInject(),
+    achievementReporter: AchievementReporter = koinInject(),
     appEventsViewModel: AppEventsViewModel = koinViewModel(),
 ) {
     val navController = rememberNavController()
@@ -85,23 +91,33 @@ fun AppNavigation(
     val coroutineScope = rememberCoroutineScope()
 
     val runMode by appSettings.runMode.collectAsStateWithLifecycle()
-    val announcementReadVersion by appSettings.announcementReadVersion.collectAsStateWithLifecycle()
+    val announcementReadHash by appSettings.announcementReadHash.collectAsStateWithLifecycle()
     val language by appSettings.language.collectAsStateWithLifecycle()
-    val scheduledCountdownState by backgroundTaskViewModel.coordinator.countdownState.collectAsStateWithLifecycle()
+    val announcementContent by announcementManager.content.collectAsStateWithLifecycle()
+
+    // 远端公告：ETag 条件请求，304（内容未变）不会触发弹窗；语言切换时重拉
+    LaunchedEffect(language) {
+        announcementManager.refresh(language)
+    }
+    val scheduledCountdownState by backgroundTaskViewModel.countdownState.collectAsStateWithLifecycle()
 
     // 判断是否处于主 Tab 页面
     val isOnMainTab = currentNavRoute == null || currentNavRoute in MAIN_TAB_ROUTES
 
     LaunchedEffect(backgroundTaskViewModel) {
-        backgroundTaskViewModel.coordinator.feedbackMessages.collect { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        backgroundTaskViewModel.launchEffects.collect { effect ->
+            when (effect) {
+                is LaunchEffect.Feedback -> {
+                    Toast.makeText(
+                        context,
+                        effect.message.resolve(context),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            }
         }
     }
-    LaunchedEffect(backgroundTaskViewModel) {
-        backgroundTaskViewModel.coordinator.countdownState.collect { state ->
-            overlayController.updateCountdownState(state)
-        }
-    }
+    // 后台倒计时 Overlay 由 CountdownUIImpl 写入；前台无倒计时不触碰
     LaunchedEffect(backgroundTaskViewModel) {
         overlayController.onCountdownClick = {
             backgroundTaskViewModel.onScheduledStartNow()
@@ -144,14 +160,15 @@ fun AppNavigation(
 
         // NavHost 只承载子页面；主 Tab 切换完全由 MainScreen 的 HorizontalPager 处理。
         // 在此统一下发 LocalToaster，使所有子页面都能弹出顶部提示。
+        val reduceMotion = LocalReduceMotion.current
         CompositionLocalProvider(LocalToaster provides toaster) {
             NavHost(
                 navController = navController,
                 startDestination = Routes.HOME,
-                enterTransition = { MaaAnimations.sharedAxisForwardEnter },
-                exitTransition = { MaaAnimations.sharedAxisForwardExit },
-                popEnterTransition = { MaaAnimations.sharedAxisPopEnter },
-                popExitTransition = { MaaAnimations.sharedAxisPopExit },
+                enterTransition = { MaaMotion.pageEnter(forward = true, reduceMotion) },
+                exitTransition = { MaaMotion.pageExit(forward = true, reduceMotion) },
+                popEnterTransition = { MaaMotion.pageEnter(forward = false, reduceMotion) },
+                popExitTransition = { MaaMotion.pageExit(forward = false, reduceMotion) },
             ) {
                 // 主 Tab 路由仅作占位，真实内容由 MainScreen 的 HorizontalPager 渲染
                 BottomNavTab.all.forEach { tab -> composable(tab.route) {} }
@@ -182,9 +199,6 @@ fun AppNavigation(
                 composable(Routes.TASK_OVERRIDE_EDITOR) {
                     TaskOverrideEditorView(navController = navController)
                 }
-                composable(Routes.WAKE_SCHEDULE_EDITOR) {
-                    WakeScheduleEditorView(navController = navController)
-                }
             }
         }
         ResourceLoadingOverlay()
@@ -208,30 +222,35 @@ fun AppNavigation(
                 onStartNow = { backgroundTaskViewModel.onScheduledStartNow() },
             )
         }
-        // 长期公告弹窗：每次公告版本变更后首次启动自动弹出，或从设置中手动打开
-        val needsToShow = announcementReadVersion != AnnouncementConfig.CURRENT_VERSION
+        // 长期公告弹窗：远端内容变化（哈希与已读标记不符）后首次启动自动弹出，或从设置中手动打开
+        val current = announcementContent
+        val needsToShow = current != null && current.hash != announcementReadHash
         val showAnnouncement = forceShowAnnouncement || (needsToShow && !announcementDismissedOnce)
-        val announcementMarkdown = remember(showAnnouncement, language) {
-            if (showAnnouncement) {
-                AnnouncementConfig.loadContent(context, language)
-            } else {
+        val shownAnnouncement = remember(showAnnouncement, language, current) {
+            if (!showAnnouncement) {
                 null
+            } else {
+                // 手动打开时拉取可能尚未完成，回退内置 assets
+                current ?: AnnouncementConfig.loadContent(context, language)
+                    .takeIf { it.isNotBlank() }
+                    ?.let { AnnouncementContent.of(it) }
             }
         }
-        if (announcementMarkdown != null) {
+        if (shownAnnouncement != null) {
             AnnouncementDialog(
                 imageAssetPath = remember(language) { AnnouncementConfig.imageAssetPath(language) },
-                markdown = announcementMarkdown,
+                markdown = shownAnnouncement.markdown,
                 onDismiss = { dontShowAgain ->
                     forceShowAnnouncement = false
                     if (dontShowAgain) {
                         coroutineScope.launch {
-                            appSettings.setAnnouncementReadVersion(AnnouncementConfig.CURRENT_VERSION)
+                            appSettings.setAnnouncementReadHash(shownAnnouncement.hash)
                         }
                     } else {
                         announcementDismissedOnce = true
                     }
                 },
+                onStubbornUnlock = { achievementReporter.reportAnnouncementStubbornClick() },
             )
         }
     }
